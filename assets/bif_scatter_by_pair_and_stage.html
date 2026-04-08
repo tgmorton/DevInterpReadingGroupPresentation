@@ -1,0 +1,198 @@
+<style>
+.w{padding:0.5rem 0}
+.sel{display:flex;gap:12px;margin:0 0 8px;flex-wrap:wrap;align-items:center}
+.sel label{font-size:12px;color:var(--color-text-secondary)}
+.btns{display:flex;gap:3px}
+.btns button{font-size:12px;padding:4px 10px;border-radius:var(--border-radius-md);cursor:pointer;border:0.5px solid var(--color-border-tertiary);background:var(--color-background-primary);color:var(--color-text-secondary);transition:all .15s}
+.btns button.on{background:var(--color-text-primary);color:var(--color-background-primary)}
+.row{display:flex;gap:12px;align-items:flex-start}
+.col-cv{flex:1;min-width:0}
+canvas{width:100%;border-radius:var(--border-radius-lg);display:block;border:0.5px solid var(--color-border-tertiary)}
+.col-r{flex:0 0 190px;display:flex;flex-direction:column;gap:6px}
+.card{border-radius:var(--border-radius-md);padding:6px 10px;border-left:3px solid}
+.card .ml{font-size:11px;margin:0 0 1px}
+.card .mv{font-size:13px;font-weight:500;font-family:var(--font-mono)}
+.mc{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:6px 10px}
+.mc .ml{font-size:11px;color:var(--color-text-secondary);margin:0 0 1px}
+.mc .mv{font-size:16px;font-weight:500;font-family:var(--font-mono)}
+.desc{font-size:12px;color:var(--color-text-secondary);line-height:1.6;margin:6px 0 0;min-height:50px}
+</style>
+<div class="w">
+<div class="sel">
+  <label>Pair:</label>
+  <div class="btns" id="pairBtns"></div>
+</div>
+<div class="sel">
+  <label>Stage:</label>
+  <div class="btns" id="stageBtns"></div>
+</div>
+<div class="row">
+  <div class="col-cv">
+    <canvas id="cv" style="height:320px"></canvas>
+  </div>
+  <div class="col-r">
+    <div class="card" style="border-color:#1D9E75">
+      <div class="ml" style="color:#085041">Phase U</div>
+      <div class="mv" id="uDesc" style="color:#085041">—</div>
+    </div>
+    <div class="card" style="border-color:#D85A30">
+      <div class="ml" style="color:#712B13">Phase V</div>
+      <div class="mv" id="vDesc" style="color:#712B13">—</div>
+    </div>
+    <div class="card" style="border-color:#534AB7;background:var(--color-background-secondary)">
+      <div class="ml" style="color:#3C3489">Between-phase</div>
+      <div class="mv" id="vBet" style="color:#3C3489">—</div>
+    </div>
+    <div class="mc">
+      <div class="ml">BIF(dog, query)</div>
+      <div class="mv" id="vBIF">—</div>
+    </div>
+  </div>
+</div>
+<div class="desc" id="desc"></div>
+</div>
+<script>
+const pairs=[
+  {name:'dog \u2192 cat',query:'cat'},
+  {name:'dog \u2192 penguin',query:'penguin'},
+  {name:'dog \u2192 lily',query:'lily'},
+];
+const stages=[
+  {name:'Before training',epoch:'t \u2248 0'},
+  {name:'Animal / plant',epoch:'t \u2248 2k'},
+  {name:'Mammal / bird',epoch:'t \u2248 5k'},
+  {name:'Dog / cat',epoch:'t \u2248 8k'},
+  {name:'Converged',epoch:'t \u2248 10k'},
+];
+
+const data={
+  'cat':[
+    {uD:0.30,uQ:0.30,vD:0.30,vQ:0.30,piU:1,uLab:'no structure yet',vLab:'—',desc:'Only one phase. No differentiation. BIF is near zero.'},
+    {uD:0.28,uQ:0.28,vD:0.15,vQ:0.15,piU:0.5,uLab:'undifferentiated',vLab:'learned "animal"',desc:'Both dog and cat benefit from learning animal features. Both losses drop together in phase V. Mean shifts are in the SAME direction \u2192 positive between-phase cov \u2192 negative BIF.'},
+    {uD:0.18,uQ:0.18,vD:0.10,vQ:0.10,piU:0.5,uLab:'generic animal',vLab:'learned "mammal"',desc:'Both are mammals. Both benefit from the mammal/bird split. Losses still move together. Still negative BIF \u2014 this is the deep trough in the LOO plot for cat.'},
+    {uD:0.12,uQ:0.12,vD:0.05,vQ:0.22,piU:0.5,uLab:'generic mammal',vLab:'dog specialized',desc:'Now the model is differentiating dog from cat. Dog loss goes DOWN in phase V, cat loss goes UP \u2014 the weights are redirected toward dog-specific features. Opposite mean shifts \u2192 negative between-phase cov \u2192 POSITIVE BIF. The sign flip.'},
+    {uD:0.05,uQ:0.08,vD:0.05,vQ:0.08,piU:1,uLab:'fully resolved',vLab:'—',desc:'Differentiation complete. Single phase, no tension. BIF returns toward zero.'},
+  ],
+  'penguin':[
+    {uD:0.30,uQ:0.30,vD:0.30,vQ:0.30,piU:1,uLab:'no structure yet',vLab:'—',desc:'Only one phase. No differentiation. BIF is near zero.'},
+    {uD:0.28,uQ:0.28,vD:0.15,vQ:0.16,piU:0.5,uLab:'undifferentiated',vLab:'learned "animal"',desc:'Both dog and penguin benefit from learning animal features. Both losses drop in phase V. Same direction \u2192 negative BIF. Dog is helping penguin.'},
+    {uD:0.16,uQ:0.16,vD:0.08,vQ:0.25,piU:0.5,uLab:'generic animal',vLab:'mammal/bird split',desc:'Now the model is splitting mammals from birds. Dog loss goes DOWN (mammal features help), penguin loss goes UP (mammal features HURT a bird). Opposite shifts \u2192 POSITIVE BIF. This is the sign flip \u2014 the peak in the LOO plot.'},
+    {uD:0.08,uQ:0.12,vD:0.08,vQ:0.12,piU:1,uLab:'subgroups resolved',vLab:'—',desc:'Mammal/bird split is resolved. Dog/cat transition doesn\u2019t affect penguin much. Single phase, BIF near zero.'},
+    {uD:0.05,uQ:0.06,vD:0.05,vQ:0.06,piU:1,uLab:'fully resolved',vLab:'—',desc:'All items distinguished. BIF near zero.'},
+  ],
+  'lily':[
+    {uD:0.30,uQ:0.30,vD:0.30,vQ:0.30,piU:1,uLab:'no structure yet',vLab:'—',desc:'Only one phase. No differentiation. BIF is near zero.'},
+    {uD:0.28,uQ:0.28,vD:0.14,vQ:0.38,piU:0.5,uLab:'undifferentiated',vLab:'animal/plant split',desc:'Dog is an animal, lily is a plant. In phase V, dog loss goes DOWN (animal features help), lily loss goes UP (animal features pull AWAY from plant features). Opposite shifts \u2192 POSITIVE BIF. Dog hurts lily from the start.'},
+    {uD:0.14,uQ:0.20,vD:0.14,vQ:0.20,piU:1,uLab:'split resolved',vLab:'—',desc:'Animal/plant transition is done. The mammal/bird split doesn\u2019t involve lily at all. Single phase, BIF near zero. Lily and dog are now independent.'},
+    {uD:0.08,uQ:0.10,vD:0.08,vQ:0.10,piU:1,uLab:'resolved',vLab:'—',desc:'Dog/cat transition doesn\u2019t affect lily. Still near zero.'},
+    {uD:0.05,uQ:0.06,vD:0.05,vQ:0.06,piU:1,uLab:'fully resolved',vLab:'—',desc:'All done. BIF near zero.'},
+  ],
+};
+
+let selPair=0,selStage=1;
+const NSAMP=300,NOISE=0.025;
+let _s=42;
+function rn(){_s=(_s*1664525+1013904223)&0x7FFFFFFF;return _s/0x7FFFFFFF;}
+function rg(){let u=0,v=0;while(!u)u=rn();while(!v)v=rn();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+
+function getScenario(){
+  const q=pairs[selPair].query;
+  return data[q][selStage];
+}
+
+function draw(){
+  const sc=getScenario();
+  document.getElementById('uDesc').textContent=sc.uLab;
+  document.getElementById('vDesc').textContent=sc.vLab;
+  document.getElementById('desc').textContent=sc.desc;
+
+  _s=42;
+  const pts=[];
+  for(let i=0;i<NSAMP;i++){
+    const inU=rn()<sc.piU;
+    pts.push({d:(inU?sc.uD:sc.vD)+rg()*NOISE,q:(inU?sc.uQ:sc.vQ)+rg()*NOISE,phase:inU?0:1});
+  }
+
+  const nU=pts.filter(p=>p.phase===0).length,nV=NSAMP-nU;
+  const piUa=nU/NSAMP,piVa=nV/NSAMP;
+  let mdU=0,mqU=0,mdV=0,mqV=0;
+  pts.forEach(p=>{if(p.phase===0){mdU+=p.d;mqU+=p.q;}else{mdV+=p.d;mqV+=p.q;}});
+  if(nU>0){mdU/=nU;mqU/=nU;}if(nV>0){mdV/=nV;mqV/=nV;}
+  const betweenCov=piUa*piVa*(mdU-mdV)*(mqU-mqV);
+  const bif=-betweenCov;
+
+  if(sc.piU>=1||sc.piU<=0){
+    document.getElementById('vBet').textContent='0 (one phase)';
+    document.getElementById('vBIF').textContent='\u22480';
+    document.getElementById('vBIF').style.color='var(--color-text-primary)';
+  } else {
+    document.getElementById('vBet').textContent=betweenCov.toFixed(4);
+    document.getElementById('vBIF').textContent=bif.toFixed(4);
+    document.getElementById('vBIF').style.color=bif>0.0005?'#D85A30':(bif<-0.0005?'#1D9E75':'var(--color-text-primary)');
+  }
+
+  const cv=document.getElementById('cv');
+  const dpr=window.devicePixelRatio||1;
+  const rect=cv.getBoundingClientRect();
+  const w=rect.width,h=rect.height;
+  cv.width=w*dpr;cv.height=h*dpr;
+  const c=cv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);
+  const cs=getComputedStyle(document.documentElement);
+  const gridC=cs.getPropertyValue('--color-border-tertiary').trim();
+  const txtC=cs.getPropertyValue('--color-text-secondary').trim();
+  const white=cs.getPropertyValue('--color-background-primary').trim();
+  c.fillStyle=white;c.fillRect(0,0,w,h);
+
+  const pad={l:46,r:14,t:14,b:36},pw=w-pad.l-pad.r,ph=h-pad.t-pad.b;
+  const xMin=0,xMax=0.50,yMin=0,yMax=0.50;
+  function tx(v){return pad.l+((v-xMin)/(xMax-xMin))*pw;}
+  function ty(v){return pad.t+ph-((v-yMin)/(yMax-yMin))*ph;}
+
+  c.strokeStyle=gridC;c.lineWidth=0.5;
+  c.beginPath();c.moveTo(pad.l,pad.t);c.lineTo(pad.l,pad.t+ph);c.lineTo(pad.l+pw,pad.t+ph);c.stroke();
+  c.fillStyle=txtC;c.font='11px sans-serif';
+  c.textAlign='center';c.fillText('\u2113_dog',pad.l+pw/2,h-6);
+  c.textAlign='center';c.fillText('0',pad.l,pad.t+ph+14);c.fillText('0.5',pad.l+pw,pad.t+ph+14);
+  c.save();c.translate(14,pad.t+ph/2);c.rotate(-Math.PI/2);c.textAlign='center';c.fillText('\u2113_'+pairs[selPair].query,0,0);c.restore();
+
+  pts.forEach(p=>{
+    c.fillStyle=p.phase===0?'rgba(29,158,117,0.35)':'rgba(216,90,48,0.35)';
+    c.beginPath();c.arc(tx(p.d),ty(p.q),3.5,0,Math.PI*2);c.fill();
+  });
+
+  if(sc.piU>0&&sc.piU<1){
+    c.setLineDash([5,4]);c.strokeStyle='#534AB7';c.lineWidth=2;
+    c.beginPath();c.moveTo(tx(mdU),ty(mqU));c.lineTo(tx(mdV),ty(mqV));c.stroke();
+    c.setLineDash([]);
+
+    const dx=mdU-mdV,dq=mqU-mqV;
+    const mx=(tx(mdU)+tx(mdV))/2,my=(ty(mqU)+ty(mqV))/2;
+    const sD=dx>0?'+':'\u2212',sQ=dq>0?'+':'\u2212';
+    c.fillStyle='#534AB7';c.font='500 11px sans-serif';c.textAlign='center';
+    c.fillText('\u0394dog('+sD+') \u00d7 \u0394'+pairs[selPair].query+'('+sQ+') = '+(dx*dq>0?'positive':'negative'),mx,my-12);
+  }
+
+  c.strokeStyle=white;c.lineWidth=2;
+  if(nU>0){c.fillStyle='#085041';c.beginPath();c.arc(tx(mdU),ty(mqU),8,0,Math.PI*2);c.fill();c.stroke();c.fillStyle=white;c.font='500 9px sans-serif';c.textAlign='center';c.fillText('U',tx(mdU),ty(mqU)+3);}
+  if(nV>0&&sc.piU<1){c.fillStyle='#712B13';c.beginPath();c.arc(tx(mdV),ty(mqV),8,0,Math.PI*2);c.fill();c.stroke();c.fillStyle=white;c.font='500 9px sans-serif';c.textAlign='center';c.fillText('V',tx(mdV),ty(mqV)+3);}
+}
+
+const pairEl=document.getElementById('pairBtns');
+pairs.forEach((p,i)=>{
+  const b=document.createElement('button');b.textContent=p.name;
+  if(i===selPair)b.classList.add('on');
+  b.onclick=()=>{selPair=i;pairEl.querySelectorAll('button').forEach((bb,bi)=>bb.classList.toggle('on',bi===i));draw();};
+  pairEl.appendChild(b);
+});
+
+const stageEl=document.getElementById('stageBtns');
+stages.forEach((s,i)=>{
+  const b=document.createElement('button');b.textContent=s.name;
+  if(i===selStage)b.classList.add('on');
+  b.onclick=()=>{selStage=i;stageEl.querySelectorAll('button').forEach((bb,bi)=>bb.classList.toggle('on',bi===i));draw();};
+  stageEl.appendChild(b);
+});
+
+draw();
+window.addEventListener('resize',draw);
+</script>

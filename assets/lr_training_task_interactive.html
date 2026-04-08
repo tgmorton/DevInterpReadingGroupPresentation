@@ -1,0 +1,263 @@
+
+<style>
+.top-ctrl{display:flex;gap:8px;align-items:center;margin:0 0 8px;flex-wrap:wrap}
+.top-ctrl button{font-size:12px;padding:5px 14px}
+.task-info{font-size:12px;color:var(--color-text-secondary);font-family:var(--font-mono);padding:4px 10px;border-radius:var(--border-radius-md);background:var(--color-background-secondary)}
+.seq-strip{overflow-x:auto;margin:0 0 8px;padding:4px 0}
+.seq-inner{display:flex;gap:2px;min-width:max-content;align-items:flex-end}
+.tok-block{display:flex;flex-direction:column;align-items:center;min-width:56px;cursor:pointer;padding:4px 2px;border-radius:var(--border-radius-md);transition:background .15s}
+.tok-block:hover{background:var(--color-background-secondary)}
+.tok-block.selected{background:var(--color-background-info);outline:1.5px solid var(--color-border-info);outline-offset:-1px}
+.tok-type{font-size:10px;color:var(--color-text-tertiary);margin:0 0 2px}
+.tok-val{font-size:13px;font-family:var(--font-mono);font-weight:500;padding:4px 6px;border-radius:4px;text-align:center}
+.tok-val.xv{background:#E6F1FB;color:#0C447C}
+.tok-val.yv{background:#EEEDFE;color:#3C3489}
+.tok-pos{font-size:9px;color:var(--color-text-tertiary);margin:2px 0 0}
+.causal-bar{height:3px;border-radius:2px;margin:2px 0 0;width:100%}
+.detail-row{display:flex;gap:8px;margin:0 0 6px}
+.detail-col{flex:1;min-width:0}
+.detail-col canvas{width:100%;height:180px;border-radius:var(--border-radius-md);background:var(--color-background-secondary)}
+.detail-label{font-size:12px;font-weight:500;color:var(--color-text-primary);margin:0 0 3px}
+.loss-strip{display:flex;gap:2px;margin:0 0 6px;align-items:flex-end;flex-wrap:wrap}
+.loss-item{display:flex;flex-direction:column;align-items:center;min-width:56px}
+.loss-bar-wrap{width:40px;height:60px;display:flex;align-items:flex-end;justify-content:center}
+.loss-bar{width:28px;border-radius:3px 3px 0 0;transition:height .3s}
+.loss-val{font-size:10px;font-family:var(--font-mono);color:var(--color-text-secondary);margin:2px 0 0}
+.loss-k{font-size:10px;color:var(--color-text-tertiary)}
+.total-box{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:var(--border-radius-md);background:var(--color-background-secondary);margin:0 0 6px;flex-wrap:wrap}
+.total-box .label{font-size:12px;color:var(--color-text-secondary)}
+.total-box .val{font-size:18px;font-weight:500;font-family:var(--font-mono);color:var(--color-text-primary)}
+.note{font-size:12px;color:var(--color-text-secondary);line-height:1.7;padding:8px 12px;border-radius:var(--border-radius-md);background:var(--color-background-secondary);margin:4px 0 0}
+</style>
+
+<div class="top-ctrl">
+  <button onclick="resample()">New task</button>
+  <div class="task-info" id="task-info"></div>
+  <div style="font-size:11px;color:var(--color-text-tertiary)">Click any x-token to see what the model sees at that position</div>
+</div>
+
+<div class="seq-strip"><div class="seq-inner" id="seq-strip"></div></div>
+
+<div class="detail-row">
+  <div class="detail-col">
+    <div class="detail-label" id="ctx-label">Context visible at position k=1</div>
+    <canvas id="cvCtx"></canvas>
+  </div>
+  <div class="detail-col">
+    <div class="detail-label">Per-position loss (all contribute to training)</div>
+    <canvas id="cvLoss"></canvas>
+  </div>
+</div>
+
+<div class="total-box">
+  <div><div class="label">Total training loss for this context</div></div>
+  <div class="val" id="total-loss"></div>
+  <div style="font-size:11px;color:var(--color-text-tertiary)">= (1/8) Σ (ŷ_k − y_k)²</div>
+</div>
+
+<div class="note" id="note"></div>
+
+<script>
+const dark=matchMedia('(prefers-color-scheme:dark)').matches;
+const txt=dark?'#c2c0b6':'#3d3d3a';
+const txt2=dark?'#9c9a92':'#73726c';
+const gridC=dark?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.06)';
+
+const D=4, K=8, sigma2=0.125;
+let task,xs,ys,preds,losses;
+let selK=0;
+
+function randn(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+
+function solveRidge(Xs,Ys,lam){
+  const n=Xs.length,d=Xs[0].length;
+  let XtX=Array(d).fill(0).map(()=>Array(d).fill(0));
+  let Xty=Array(d).fill(0);
+  for(let i=0;i<n;i++){for(let a=0;a<d;a++){Xty[a]+=Xs[i][a]*Ys[i];for(let b=0;b<d;b++)XtX[a][b]+=Xs[i][a]*Xs[i][b];}}
+  for(let a=0;a<d;a++)XtX[a][a]+=lam;
+  const aug=XtX.map((r,i)=>[...r,Xty[i]]);
+  for(let i=0;i<d;i++){let mx=i;for(let j=i+1;j<d;j++)if(Math.abs(aug[j][i])>Math.abs(aug[mx][i]))mx=j;[aug[i],aug[mx]]=[aug[mx],aug[i]];if(Math.abs(aug[i][i])<1e-10)return null;for(let j=i+1;j<d;j++){const f=aug[j][i]/aug[i][i];for(let k=i;k<=d;k++)aug[j][k]-=f*aug[i][k];}}
+  const x=Array(d).fill(0);for(let i=d-1;i>=0;i--){x[i]=aug[i][d];for(let j=i+1;j<d;j++)x[i]-=aug[i][j]*x[j];x[i]/=aug[i][i];}
+  return x;
+}
+
+function resample(){
+  task=[];for(let i=0;i<D;i++)task.push(randn());
+  xs=[];ys=[];preds=[];losses=[];
+  for(let k=0;k<K;k++){
+    const x=[];for(let i=0;i<D;i++)x.push(randn());
+    xs.push(x);
+    ys.push(task.reduce((s,ti,i)=>s+ti*x[i],0)+randn()*Math.sqrt(sigma2));
+  }
+  // Compute predictions using ridge regression with available context
+  for(let k=0;k<K;k++){
+    if(k===0){preds.push(0);} // No context - predict 0
+    else{
+      const tHat=solveRidge(xs.slice(0,k),ys.slice(0,k),0.3);
+      if(tHat) preds.push(tHat.reduce((s,ti,i)=>s+ti*xs[k][i],0));
+      else preds.push(0);
+    }
+    losses.push((preds[k]-ys[k])**2);
+  }
+  document.getElementById('task-info').textContent='t = ['+task.map(v=>v.toFixed(2)).join(', ')+'] (hidden from model)';
+  selK=0;
+  buildStrip();
+  render();
+}
+
+function buildStrip(){
+  let html='';
+  for(let k=0;k<K;k++){
+    // x-token
+    html+=`<div class="tok-block ${k===selK?'selected':''}" onclick="selK=${k};buildStrip();render()">`;
+    html+=`<div class="tok-type">x${k+1}</div>`;
+    html+=`<div class="tok-val xv">${xs[k].slice(0,2).map(v=>v.toFixed(1)).join(', ')}…</div>`;
+    // Causal visibility bar
+    html+=`<div class="causal-bar" style="background:${k<=selK?'#378ADD':'var(--color-border-tertiary)'}"></div>`;
+    html+=`<div class="tok-pos">pos ${k*2}</div>`;
+    html+=`</div>`;
+    // y-token
+    const yVisible = k < selK; // at selK's x-position, can see y_k only if k < selK
+    html+=`<div class="tok-block" style="opacity:${yVisible?1:0.35};cursor:default">`;
+    html+=`<div class="tok-type">y${k+1}</div>`;
+    html+=`<div class="tok-val yv">${ys[k].toFixed(2)}</div>`;
+    html+=`<div class="causal-bar" style="background:${yVisible?'#7F77DD':'var(--color-border-tertiary)'}"></div>`;
+    html+=`<div class="tok-pos">pos ${k*2+1}</div>`;
+    html+=`</div>`;
+  }
+  document.getElementById('seq-strip').innerHTML=html;
+}
+
+function sc(id){const cv=document.getElementById(id);const dpr=window.devicePixelRatio||1;const r=cv.getBoundingClientRect();cv.width=r.width*dpr;cv.height=r.height*dpr;const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);return{ctx,w:r.width,h:r.height};}
+
+function render(){
+  document.getElementById('ctx-label').textContent=`At x${selK+1}: model sees ${selK} complete (x,y) pairs + current x${selK+1}`;
+
+  // Context scatter
+  const{ctx:c1,w:w1,h:h1}=sc('cvCtx');
+  const p={l:36,r:12,t:12,b:24};
+  const pw=w1-p.l-p.r,ph=h1-p.t-p.b;
+
+  // Compute ranges from all data
+  const allDot=xs.map(x=>x[0]);
+  const allY=ys;
+  const xr=Math.max(...allDot.map(Math.abs),0.5)*1.3;
+  const yr=Math.max(...allY.map(Math.abs),0.5)*1.3;
+  function tx(v){return p.l+(v/xr*0.5+0.5)*pw;}
+  function ty(v){return p.t+ph-(v/yr*0.5+0.5)*ph;}
+
+  // Grid
+  c1.strokeStyle=gridC;c1.lineWidth=0.5;
+  c1.beginPath();c1.moveTo(p.l,p.t);c1.lineTo(p.l,p.t+ph);c1.lineTo(p.l+pw,p.t+ph);c1.stroke();
+  c1.setLineDash([3,3]);
+  c1.beginPath();c1.moveTo(p.l,ty(0));c1.lineTo(p.l+pw,ty(0));c1.stroke();
+  c1.beginPath();c1.moveTo(tx(0),p.t);c1.lineTo(tx(0),p.t+ph);c1.stroke();
+  c1.setLineDash([]);
+
+  // True line (dim 0 projection)
+  c1.strokeStyle='#D85A30';c1.lineWidth=1;c1.globalAlpha=0.3;c1.setLineDash([4,3]);
+  c1.beginPath();c1.moveTo(tx(-xr),ty(-xr*task[0]));c1.lineTo(tx(xr),ty(xr*task[0]));c1.stroke();
+  c1.setLineDash([]);c1.globalAlpha=1;
+
+  // Context points (visible before selK)
+  for(let k=0;k<selK;k++){
+    const sx=tx(xs[k][0]),sy=ty(ys[k]);
+    c1.fillStyle='#378ADD';c1.beginPath();c1.arc(sx,sy,5,0,Math.PI*2);c1.fill();
+    c1.fillStyle=txt;c1.font='500 10px var(--font-mono)';c1.textAlign='center';
+    c1.fillText((k+1),sx+8,sy-6);
+  }
+
+  // Current query point (x only, no y)
+  const qx=tx(xs[selK][0]),qy_true=ty(ys[selK]),qy_pred=ty(preds[selK]);
+  // Vertical line showing prediction vs truth
+  c1.strokeStyle='#D85A30';c1.lineWidth=1.5;c1.setLineDash([3,3]);
+  c1.beginPath();c1.moveTo(qx,qy_pred);c1.lineTo(qx,qy_true);c1.stroke();c1.setLineDash([]);
+
+  // True y (hollow)
+  c1.strokeStyle='#D85A30';c1.lineWidth=2;c1.beginPath();c1.arc(qx,qy_true,6,0,Math.PI*2);c1.stroke();
+  // Pred y (filled)
+  c1.fillStyle='#D85A30';c1.beginPath();c1.arc(qx,qy_pred,5,0,Math.PI*2);c1.fill();
+  // Query x marker
+  c1.strokeStyle='#BA7517';c1.lineWidth=2;
+  c1.beginPath();c1.moveTo(qx,p.t+ph);c1.lineTo(qx,p.t+ph-8);c1.stroke();
+
+  // Legend
+  c1.font='10px var(--font-sans)';c1.textAlign='left';
+  c1.fillStyle='#378ADD';c1.fillText('visible (x,y) pairs',p.l+4,p.t+10);
+  c1.fillStyle='#D85A30';c1.fillText('prediction ŷ (filled) vs true y (ring)',p.l+4,p.t+22);
+  c1.fillStyle=txt2;c1.fillText(`${selK} examples → predict y${selK+1}`,p.l+4,p.t+34);
+
+  c1.fillStyle=txt2;c1.font='11px var(--font-sans)';
+  c1.textAlign='center';c1.fillText('x[0] (first dim)',p.l+pw/2,h1-4);
+  c1.save();c1.translate(8,p.t+ph/2);c1.rotate(-Math.PI/2);c1.textAlign='center';c1.fillText('y',0,0);c1.restore();
+
+  // Per-position loss bars
+  const{ctx:c2,w:w2,h:h2}=sc('cvLoss');
+  const p2={l:36,r:12,t:12,b:24};
+  const pw2=w2-p2.l-p2.r,ph2=h2-p2.t-p2.b;
+
+  c2.strokeStyle=gridC;c2.lineWidth=0.5;
+  c2.beginPath();c2.moveTo(p2.l,p2.t);c2.lineTo(p2.l,p2.t+ph2);c2.lineTo(p2.l+pw2,p2.t+ph2);c2.stroke();
+
+  const maxL=Math.max(...losses,0.5)*1.1;
+  const barW=pw2/K*0.65;
+  const gap=pw2/K;
+
+  for(let k=0;k<K;k++){
+    const bx=p2.l+k*gap+(gap-barW)/2;
+    const bh=(losses[k]/maxL)*ph2*0.9;
+    const isSel=k===selK;
+
+    // Bar
+    c2.fillStyle=isSel?'#D85A30':'#BA7517';
+    c2.globalAlpha=isSel?1:0.5;
+    c2.fillRect(bx,p2.t+ph2-bh,barW,bh);
+    c2.globalAlpha=1;
+
+    // Value on top
+    c2.fillStyle=isSel?'#D85A30':txt2;
+    c2.font=`${isSel?'500':'400'} 10px var(--font-mono)`;
+    c2.textAlign='center';
+    c2.fillText(losses[k].toFixed(3),bx+barW/2,p2.t+ph2-bh-4);
+
+    // Label
+    c2.fillStyle=txt2;c2.font='10px var(--font-mono)';
+    c2.fillText('k='+(k+1),bx+barW/2,p2.t+ph2+14);
+
+    // Context count
+    c2.font='9px var(--font-sans)';
+    c2.fillStyle=dark?'rgba(255,255,255,0.3)':'rgba(0,0,0,0.25)';
+    c2.fillText(k+'ctx',bx+barW/2,p2.t+ph2-bh+12);
+  }
+
+  // Mean line
+  const meanL=losses.reduce((a,b)=>a+b,0)/K;
+  const meanY=p2.t+ph2-(meanL/maxL)*ph2*0.9;
+  c2.strokeStyle='#1D9E75';c2.lineWidth=1.5;c2.setLineDash([5,4]);
+  c2.beginPath();c2.moveTo(p2.l,meanY);c2.lineTo(p2.l+pw2,meanY);c2.stroke();c2.setLineDash([]);
+  c2.fillStyle='#1D9E75';c2.font='500 11px var(--font-sans)';c2.textAlign='left';
+  c2.fillText('mean = '+meanL.toFixed(3),p2.l+4,meanY-5);
+
+  c2.fillStyle=txt2;c2.font='11px var(--font-sans)';
+  c2.textAlign='center';c2.fillText('Position',p2.l+pw2/2,h2-4);
+  c2.save();c2.translate(8,p2.t+ph2/2);c2.rotate(-Math.PI/2);c2.textAlign='center';c2.fillText('(ŷ_k − y_k)²',0,0);c2.restore();
+
+  // Total
+  document.getElementById('total-loss').textContent=meanL.toFixed(4);
+
+  // Note
+  const notes=[
+    `<strong style="color:var(--color-text-primary)">k=1 (0 context):</strong> The model sees only x₁ — no previous (x,y) pairs. It cannot know anything about the task t. The best it can do is predict the prior mean: ŷ = 0. This is what the model learns to do during stage LR1. The expected loss here is E[y²] = D + σ² = ${(D+sigma2).toFixed(3)}.`,
+    `<strong style="color:var(--color-text-primary)">k=2 (1 example):</strong> The model has seen one complete (x₁, y₁) pair plus current x₂. One example in D=4 dimensions is severely underdetermined — but it gives some information about the direction of t. The prediction should improve slightly.`,
+    `<strong style="color:var(--color-text-primary)">k=3 (2 examples):</strong> Two examples. Still underdetermined (need at least D=4 for a unique solution), but the model can start narrowing down the task.`,
+    `<strong style="color:var(--color-text-primary)">k=4 (3 examples):</strong> Three examples. Almost enough to determine the 4-dim task.`,
+    `<strong style="color:var(--color-text-primary)">k=5 (4 examples):</strong> With D=4 examples, there's now a unique least-squares solution for t (if inputs are linearly independent). The loss should drop substantially here. This is where ICL really pays off.`,
+    `<strong style="color:var(--color-text-primary)">k=6 (5 examples):</strong> Overdetermined — more examples than dimensions. Additional examples help reduce the effect of noise (σ²).`,
+    `<strong style="color:var(--color-text-primary)">k=7 (6 examples):</strong> The prediction continues to refine. The irreducible noise floor is σ² = 0.125.`,
+    `<strong style="color:var(--color-text-primary)">k=8 (7 examples):</strong> Maximum context. Best possible prediction. Loss approaches σ² = 0.125 for a good ICL model. All 8 position losses are averaged together for the training gradient — the model is trained to predict well everywhere, not just at the end.`,
+  ];
+  document.getElementById('note').innerHTML=notes[selK];
+}
+
+resample();
+</script>

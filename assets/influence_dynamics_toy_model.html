@@ -1,0 +1,265 @@
+<style>
+.w{padding:0.5rem 0}
+.top{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 6px}
+.top label{font-size:13px;color:var(--color-text-secondary)}
+.btns{display:flex;gap:3px;flex-wrap:wrap}
+.btns button{font-size:12px;padding:4px 10px;border-radius:var(--border-radius-md);cursor:pointer;border:0.5px solid var(--color-border-tertiary);background:var(--color-background-primary);color:var(--color-text-secondary);transition:all .15s}
+.btns button:hover{border-color:var(--color-border-secondary)}
+.btns button.on{border-width:1.5px}
+.clabel{font-size:12px;font-weight:500;color:var(--color-text-secondary);margin:10px 0 2px}
+canvas{width:100%;border-radius:var(--border-radius-lg);background:var(--color-background-secondary);display:block}
+.leg{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 0}
+.li{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--color-text-secondary);cursor:pointer}
+.li .d{width:14px;height:3px;border-radius:1px}
+.note{font-size:11px;color:var(--color-text-tertiary);margin:4px 0 0;line-height:1.5}
+</style>
+<div class="w">
+<div class="top">
+  <label>Influence of</label>
+  <div class="btns" id="btns"></div>
+  <label>on all other samples</label>
+</div>
+<div class="clabel">Per-sample loss during training</div>
+<canvas id="cvL" style="height:140px"></canvas>
+<div class="clabel" id="mainLabel">LOO loss difference: Δℓ = ℓ(full) − ℓ(without dog)</div>
+<canvas id="cvD" style="height:260px"></canvas>
+<div class="leg" id="leg"></div>
+<div class="note">Negative Δ = removing the sample hurts query (facilitation / priming). Positive Δ = removing helps (interference). Dashed lines mark approximate phase transitions.</div>
+</div>
+<script>
+const N=8,O=8,Hid=12,LR=0.003,EP=12000,SMP=24;
+const names=['pine','oak','rose','lily','sparrow','penguin','cat','dog'];
+const cols=['#2d5a7b','#85B7EB','#E24B4A','#ED93B1','#534AB7','#1D9E75','#D85A30','#BA7517'];
+const hier={plants:[0,1,2,3],animals:[4,5,6,7],trees:[0,1],flowers:[2,3],birds:[4,5],mammals:[6,7]};
+
+const modes=[
+  {v:[1,1,1,1,1,1,1,1],s:4.0},
+  {v:[1,1,1,1,-1,-1,-1,-1],s:2.8},
+  {v:[1,1,-1,-1,0,0,0,0],s:1.6},
+  {v:[0,0,0,0,1,1,-1,-1],s:1.6},
+  {v:[1,-1,0,0,0,0,0,0],s:0.55},
+  {v:[0,0,1,-1,0,0,0,0],s:0.55},
+  {v:[0,0,0,0,1,-1,0,0],s:0.55},
+  {v:[0,0,0,0,0,0,1,-1],s:0.55}
+];
+
+const Y=[],YT=[];
+for(let i=0;i<N;i++){Y[i]=[];for(let k=0;k<O;k++){const nm=Math.sqrt(modes[k].v.reduce((a,x)=>a+x*x,0));Y[i][k]=modes[k].s*modes[k].v[i]/nm;}}
+for(let o=0;o<O;o++){YT[o]=[];for(let i=0;i<N;i++)YT[o][i]=Y[i][o];}
+
+let _s=0;
+function sr(s){_s=s;}
+function rn(){_s=(_s*1664525+1013904223)&0x7FFFFFFF;return _s/0x7FFFFFFF;}
+function rg(){let u=0,v=0;while(!u)u=rn();while(!v)v=rn();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+
+sr(12345);
+const W1i=[],W2i=[];
+for(let i=0;i<Hid;i++){W1i[i]=[];for(let j=0;j<N;j++)W1i[i][j]=rg()*0.001;}
+for(let i=0;i<O;i++){W2i[i]=[];for(let j=0;j<Hid;j++)W2i[i][j]=rg()*0.001;}
+
+function mm(A,B){const m=A.length,k=A[0].length,n=B[0].length,C=[];for(let i=0;i<m;i++){C[i]=new Array(n);for(let j=0;j<n;j++){let s=0;for(let p=0;p<k;p++)s+=A[i][p]*B[p][j];C[i][j]=s;}}return C;}
+
+function train(mask){
+  const w1=W1i.map(r=>r.slice()),w2=W2i.map(r=>r.slice());
+  const ac=mask.reduce((a,x)=>a+x,0);
+  const lr=LR/ac;
+  const losses=[];
+  for(let ep=0;ep<=EP;ep++){
+    const ww=mm(w2,w1);
+    if(ep%SMP===0){
+      const l=[];
+      for(let j=0;j<N;j++){let s=0;for(let o=0;o<O;o++)s+=(ww[o][j]-YT[o][j])**2;l.push(0.5*s);}
+      losses.push(l);
+    }
+    if(ep===EP)break;
+    const gw2=Array.from({length:O},()=>new Array(Hid).fill(0));
+    const gw1=Array.from({length:Hid},()=>new Array(N).fill(0));
+    for(let p=0;p<N;p++){
+      if(!mask[p])continue;
+      for(let o=0;o<O;o++){
+        const r=ww[o][p]-YT[o][p];
+        for(let j=0;j<Hid;j++)gw2[o][j]+=r*w1[j][p];
+        for(let i=0;i<Hid;i++)gw1[i][p]+=w2[o][i]*r;
+      }
+    }
+    for(let i=0;i<O;i++)for(let j=0;j<Hid;j++)w2[i][j]-=lr*gw2[i][j];
+    for(let i=0;i<Hid;i++)for(let j=0;j<N;j++)w1[i][j]-=lr*gw1[i][j];
+  }
+  return losses;
+}
+
+const fullMask=[1,1,1,1,1,1,1,1];
+const fullL=train(fullMask);
+const looL=[];
+for(let p=0;p<N;p++){const m=fullMask.slice();m[p]=0;looL.push(train(m));}
+
+const T=fullL.length;
+const diffs=[];
+for(let p=0;p<N;p++){
+  diffs[p]=[];
+  for(let t=0;t<T;t++){
+    diffs[p][t]=[];
+    for(let j=0;j<N;j++) diffs[p][t][j]=fullL[t][j]-looL[p][t][j];
+  }
+}
+
+let sel=7;
+
+function setupCv(id){
+  const cv=document.getElementById(id);
+  const dpr=window.devicePixelRatio||1;
+  const rect=cv.getBoundingClientRect();
+  const w=rect.width,h=rect.height;
+  cv.width=w*dpr;cv.height=h*dpr;
+  const ctx=cv.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
+  return{ctx,w,h};
+}
+
+function draw(){
+  document.getElementById('mainLabel').textContent='LOO loss difference: \u0394\u2113 = \u2113(full) \u2212 \u2113(without '+names[sel]+')';
+  const cs=getComputedStyle(document.documentElement);
+  const gridC=cs.getPropertyValue('--color-border-tertiary').trim()||'rgba(0,0,0,0.12)';
+  const txtC=cs.getPropertyValue('--color-text-secondary').trim()||'#888';
+  const txtT=cs.getPropertyValue('--color-text-tertiary').trim()||'#aaa';
+
+  {
+    const{ctx:c,w,h}=setupCv('cvL');
+    const pad={l:44,r:12,t:8,b:22};
+    const pw=w-pad.l-pad.r,ph=h-pad.t-pad.b;
+    let yMax=0;
+    for(let t=0;t<T;t++)for(let j=0;j<N;j++)if(fullL[t][j]>yMax)yMax=fullL[t][j];
+    yMax*=1.05;
+
+    c.strokeStyle=gridC;c.lineWidth=0.5;
+    c.beginPath();c.moveTo(pad.l,pad.t);c.lineTo(pad.l,pad.t+ph);c.lineTo(pad.l+pw,pad.t+ph);c.stroke();
+
+    c.fillStyle=txtC;c.font='11px sans-serif';c.textAlign='right';
+    c.fillText(yMax.toFixed(1),pad.l-4,pad.t+10);
+    c.fillText('0',pad.l-4,pad.t+ph+4);
+    c.textAlign='center';
+    c.fillText('0',pad.l,pad.t+ph+14);
+    c.fillText(EP+'',pad.l+pw,pad.t+ph+14);
+
+    for(let j=0;j<N;j++){
+      c.beginPath();
+      for(let t=0;t<T;t++){
+        const x=pad.l+(t/(T-1))*pw;
+        const y=pad.t+ph-(fullL[t][j]/yMax)*ph;
+        t===0?c.moveTo(x,y):c.lineTo(x,y);
+      }
+      c.strokeStyle=cols[j];c.lineWidth=j===sel?2:1;c.globalAlpha=j===sel?1:0.5;c.stroke();c.globalAlpha=1;
+    }
+  }
+
+  {
+    const{ctx:c,w,h}=setupCv('cvD');
+    const pad={l:44,r:12,t:12,b:24};
+    const pw=w-pad.l-pad.r,ph=h-pad.t-pad.b;
+    let yMin=0,yMax=0;
+    for(let t=0;t<T;t++)for(let j=0;j<N;j++){
+      const v=diffs[sel][t][j];
+      if(v<yMin)yMin=v;if(v>yMax)yMax=v;
+    }
+    const mg=Math.max(Math.abs(yMin),Math.abs(yMax))*1.15||0.1;
+    yMin=-mg;yMax=mg;
+
+    function tx(t){return pad.l+(t/(T-1))*pw;}
+    function ty(v){return pad.t+ph-(v-yMin)/(yMax-yMin)*ph;}
+
+    c.strokeStyle=gridC;c.lineWidth=0.5;
+    c.beginPath();c.moveTo(pad.l,pad.t);c.lineTo(pad.l,pad.t+ph);c.lineTo(pad.l+pw,pad.t+ph);c.stroke();
+    c.setLineDash([3,3]);c.beginPath();c.moveTo(pad.l,ty(0));c.lineTo(pad.l+pw,ty(0));c.stroke();c.setLineDash([]);
+
+    c.fillStyle=txtC;c.font='11px sans-serif';c.textAlign='right';
+    c.fillText(yMax.toFixed(2),pad.l-4,pad.t+10);
+    c.fillText(yMin.toFixed(2),pad.l-4,pad.t+ph+4);
+    c.fillText('0',pad.l-4,ty(0)+4);
+    c.textAlign='center';
+    c.fillText('0',pad.l,pad.t+ph+16);
+    c.fillText('Epochs',pad.l+pw/2,pad.t+ph+16);
+    c.fillText(EP+'',pad.l+pw,pad.t+ph+16);
+
+    const transitions=findTransitions();
+    const tLabels=['animals vs plants','mammals vs birds','dog vs cat'];
+    const tColors=['rgba(0,0,0,0.08)','rgba(0,0,0,0.08)','rgba(0,0,0,0.08)'];
+    transitions.forEach((tr,i)=>{
+      if(i>=3)return;
+      const x=tx(tr);
+      c.strokeStyle=txtT;c.lineWidth=0.5;c.setLineDash([4,4]);
+      c.beginPath();c.moveTo(x,pad.t);c.lineTo(x,pad.t+ph);c.stroke();c.setLineDash([]);
+      if(i<tLabels.length){
+        c.fillStyle=txtT;c.font='10px sans-serif';c.textAlign='center';
+        c.save();c.translate(x-6,pad.t+ph/2);c.rotate(-Math.PI/2);c.fillText(tLabels[i],0,0);c.restore();
+      }
+    });
+
+    c.fillStyle=txtC;c.font='500 11px sans-serif';c.textAlign='left';
+    const zy=ty(0);
+    c.globalAlpha=0.6;
+    c.fillText('\u2190 helps query (priming)',pad.l+4,zy+14);
+    c.fillText('\u2192 hurts query (interference)',pad.l+4,zy-6);
+    c.globalAlpha=1;
+
+    for(let j=0;j<N;j++){
+      if(j===sel)continue;
+      c.beginPath();
+      for(let t=0;t<T;t++){
+        const x=tx(t),y=ty(diffs[sel][t][j]);
+        t===0?c.moveTo(x,y):c.lineTo(x,y);
+      }
+      c.strokeStyle=cols[j];c.lineWidth=1.5;c.stroke();
+
+      const lastV=diffs[sel][T-1][j];
+      const ly=ty(lastV);
+      c.fillStyle=cols[j];c.font='500 11px sans-serif';c.textAlign='left';
+      c.fillText(names[j],pad.l+pw+4,ly+4);
+    }
+  }
+}
+
+function findTransitions(){
+  const totalLoss=[];
+  for(let t=0;t<T;t++){let s=0;for(let j=0;j<N;j++)s+=fullL[t][j];totalLoss.push(s/N);}
+  const dL=[];
+  for(let t=1;t<T;t++)dL.push(totalLoss[t]-totalLoss[t-1]);
+  const d2L=[];
+  for(let t=1;t<dL.length;t++)d2L.push(dL[t]-dL[t-1]);
+  const peaks=[];
+  for(let t=2;t<d2L.length-2;t++){
+    if(d2L[t]>d2L[t-1]&&d2L[t]>d2L[t+1]&&d2L[t]>0){
+      peaks.push({t:t+1,v:d2L[t]});
+    }
+  }
+  peaks.sort((a,b)=>b.v-a.v);
+  const top=peaks.slice(0,3).sort((a,b)=>a.t-b.t);
+  return top.map(p=>p.t);
+}
+
+const btnsEl=document.getElementById('btns');
+names.forEach((n,i)=>{
+  const b=document.createElement('button');
+  b.textContent=n;
+  b.style.borderColor=cols[i];
+  if(i===sel){b.classList.add('on');b.style.background=cols[i];b.style.color='#fff';}
+  b.onclick=()=>{
+    sel=i;
+    btnsEl.querySelectorAll('button').forEach((bb,bi)=>{
+      bb.classList.toggle('on',bi===i);
+      bb.style.background=bi===i?cols[bi]:'';
+      bb.style.color=bi===i?'#fff':'';
+    });
+    draw();
+  };
+  btnsEl.appendChild(b);
+});
+
+const legEl=document.getElementById('leg');
+names.forEach((n,i)=>{
+  const d=document.createElement('div');d.className='li';
+  d.innerHTML='<span class="d" style="background:'+cols[i]+'"></span>'+n;
+  legEl.appendChild(d);
+});
+
+draw();
+window.addEventListener('resize',draw);
+</script>

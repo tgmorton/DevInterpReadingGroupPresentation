@@ -1,0 +1,216 @@
+<style>
+.ctrl{display:flex;align-items:center;gap:12px;margin:0 0 12px}
+.ctrl label{font-size:13px;color:var(--color-text-secondary);min-width:80px}
+.col{display:flex;gap:16px;flex-wrap:wrap}
+.panel{flex:1;min-width:200px;background:var(--color-background-secondary);border-radius:var(--border-radius-lg);padding:12px 16px}
+.panel h3{font-size:14px;font-weight:500;margin:0 0 8px;color:var(--color-text-primary)}
+.val{font-family:var(--font-mono);font-size:13px;line-height:1.8}
+.pos{color:#1D9E75}.neg{color:#E24B4A}.zero{color:var(--color-text-tertiary)}
+.err{background:#FCEBEB;border-radius:4px;padding:0 4px}
+.perfect{background:#E1F5EE;border-radius:4px;padding:0 4px}
+.feat-btn{border:0.5px solid var(--color-border-secondary);background:var(--color-background-primary);border-radius:var(--border-radius-md);padding:6px 14px;cursor:pointer;font-size:13px;color:var(--color-text-primary)}
+.feat-btn.active{background:var(--color-background-info);border-color:var(--color-border-info);color:var(--color-text-info)}
+</style>
+
+<div class="ctrl">
+<label>Active feature</label>
+<div id="feat-btns"></div>
+</div>
+<div class="ctrl">
+<label>Strength (μ)</label>
+<input type="range" min="0" max="100" value="70" id="mu-slider" style="flex:1" step="1">
+<span id="mu-val" style="font-size:13px;font-weight:500;min-width:32px">0.70</span>
+</div>
+<div class="ctrl">
+<label>Configuration</label>
+<select id="config-sel">
+<option value="4">4-gon (square) — 4 features, L=0.111</option>
+<option value="5">5-gon (pentagon) — 5 features, L=0.069</option>
+<option value="6" selected>6-gon (hexagon) — 6 features, L=0.048</option>
+</select>
+</div>
+
+<div class="col" style="margin-top:12px">
+<div class="panel" id="p-input"><h3>Input x</h3><div class="val" id="v-input"></div></div>
+<div class="panel" id="p-enc"><h3>Encoded Wx (2D)</h3><div class="val" id="v-enc"></div></div>
+<div class="panel" id="p-dec"><h3>Decoded WᵀWx + b</h3><div class="val" id="v-dec"></div></div>
+<div class="panel" id="p-out"><h3>Output ReLU(...)</h3><div class="val" id="v-out"></div></div>
+</div>
+
+<div style="margin-top:12px;display:flex;gap:16px;flex-wrap:wrap">
+<div class="panel" style="flex:2;min-width:240px">
+<h3>Weight columns in 2D space</h3>
+<svg id="vec-svg" width="100%" viewBox="0 0 300 300"></svg>
+</div>
+<div class="panel" style="flex:1;min-width:160px">
+<h3>Reconstruction error</h3>
+<div class="val" id="v-err"></div>
+<div style="margin-top:8px;font-size:12px;color:var(--color-text-secondary)" id="v-explain"></div>
+</div>
+</div>
+
+<script>
+const C = 6;
+const configs = {
+  4: {k:4, l:1.0, b:0, angles:[0, Math.PI/2, Math.PI, 3*Math.PI/2]},
+  5: {k:5, l:1.17046, b:-0.28230, angles:[0,1,2,3,4].map(i=>i*2*Math.PI/5)},
+  6: {k:6, l:1.32053, b:-0.61814, angles:[0,1,2,3,4,5].map(i=>i*2*Math.PI/6)}
+};
+
+let activeFeature = 0;
+let mu = 0.7;
+let config = '6';
+
+function getW(cfg) {
+  const c = configs[cfg];
+  const W = [];
+  for (let i = 0; i < C; i++) {
+    if (i < c.k) {
+      W.push([c.l * Math.cos(c.angles[i]), c.l * Math.sin(c.angles[i])]);
+    } else {
+      W.push([0, 0]);
+    }
+  }
+  return W;
+}
+
+function getB(cfg) {
+  const c = configs[cfg];
+  const b = [];
+  for (let i = 0; i < C; i++) {
+    b.push(i < c.k ? c.b : -0.5);
+  }
+  return b;
+}
+
+function fmt(v) {
+  const s = v.toFixed(3);
+  if (Math.abs(v) < 0.0005) return '<span class="zero">0.000</span>';
+  return v > 0 ? '<span class="pos">'+s+'</span>' : '<span class="neg">'+s+'</span>';
+}
+
+function update() {
+  const W = getW(config);
+  const b = getB(config);
+  const x = Array(C).fill(0);
+  x[activeFeature] = mu;
+
+  const enc = [0, 0];
+  for (let i = 0; i < C; i++) {
+    enc[0] += W[i][0] * x[i];
+    enc[1] += W[i][1] * x[i];
+  }
+
+  const dec = Array(C).fill(0);
+  for (let i = 0; i < C; i++) {
+    dec[i] = W[i][0]*enc[0] + W[i][1]*enc[1] + b[i];
+  }
+
+  const out = dec.map(v => Math.max(0, v));
+
+  const errs = x.map((xi, i) => (xi - out[i]) * (xi - out[i]));
+  const totalErr = errs.reduce((a,b)=>a+b, 0);
+
+  document.getElementById('v-input').innerHTML = x.map((v,i) => {
+    const tag = i === activeFeature ? 'style="font-weight:500"' : '';
+    return `<div ${tag}>x[${i+1}] = ${fmt(v)}</div>`;
+  }).join('');
+
+  document.getElementById('v-enc').innerHTML =
+    `<div>h[1] = ${fmt(enc[0])}</div><div>h[2] = ${fmt(enc[1])}</div>` +
+    `<div style="margin-top:6px;font-size:12px;color:var(--color-text-secondary)">= μ × W${activeFeature+1} = ${mu.toFixed(2)} × (${W[activeFeature][0].toFixed(2)}, ${W[activeFeature][1].toFixed(2)})</div>`;
+
+  document.getElementById('v-dec').innerHTML = dec.map((v,i) =>
+    `<div>y[${i+1}] = ${fmt(v)}</div>`
+  ).join('');
+
+  document.getElementById('v-out').innerHTML = out.map((v,i) => {
+    const isTarget = i === activeFeature;
+    const hasErr = Math.abs(x[i] - v) > 0.001;
+    const cls = isTarget ? (hasErr ? 'err' : 'perfect') : (v > 0.001 ? 'err' : '');
+    return `<div><span class="${cls}">f[${i+1}] = ${fmt(v)}</span>${isTarget ? ' target' : (v > 0.001 ? ' leak!' : '')}</div>`;
+  }).join('');
+
+  let errHtml = `<div style="font-size:16px;font-weight:500;margin-bottom:8px">‖x − f‖² = ${totalErr.toFixed(4)}</div>`;
+  errs.forEach((e,i) => {
+    if (e > 0.0001) errHtml += `<div>feature ${i+1}: ${e.toFixed(4)}</div>`;
+  });
+  document.getElementById('v-err').innerHTML = errHtml;
+
+  const c = configs[config];
+  let explain = '';
+  if (activeFeature >= c.k) {
+    explain = 'This feature has no weight vector (zero column). The network ignores it entirely — total reconstruction failure.';
+  } else {
+    const leaks = out.filter((v,i) => i !== activeFeature && v > 0.001).length;
+    if (leaks > 0) explain = `The output leaks into ${leaks} other feature(s) because those weight columns aren't orthogonal to W${activeFeature+1}. That's interference — the cost of superposition.`;
+    else explain = 'No leakage into other features for this input. The bias and ReLU managed to suppress all interference.';
+  }
+  document.getElementById('v-explain').textContent = explain;
+
+  drawVectors(W, enc);
+}
+
+function drawVectors(W, enc) {
+  const svg = document.getElementById('vec-svg');
+  const cx = 150, cy = 150, scale = 70;
+  const dark = matchMedia('(prefers-color-scheme:dark)').matches;
+  const gridC = dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)';
+  const txtC = dark ? '#c2c0b6' : '#5F5E5A';
+  const colors = ['#E24B4A','#378ADD','#1D9E75','#BA7517','#7F77DD','#D4537E'];
+
+  let html = `<circle cx="${cx}" cy="${cy}" r="${scale}" fill="none" stroke="${gridC}" stroke-width="0.5"/>`;
+  html += `<line x1="${cx-scale*1.5}" y1="${cy}" x2="${cx+scale*1.5}" y2="${cy}" stroke="${gridC}" stroke-width="0.5"/>`;
+  html += `<line x1="${cx}" y1="${cy-scale*1.5}" x2="${cx}" y2="${cy+scale*1.5}" stroke="${gridC}" stroke-width="0.5"/>`;
+
+  W.forEach((w, i) => {
+    if (Math.abs(w[0]) < 0.01 && Math.abs(w[1]) < 0.01) return;
+    const ex = cx + w[0]*scale, ey = cy - w[1]*scale;
+    const isActive = i === activeFeature;
+    const sw = isActive ? 2.5 : 1.2;
+    const op = isActive ? 1 : 0.5;
+    html += `<line x1="${cx}" y1="${cy}" x2="${ex}" y2="${ey}" stroke="${colors[i]}" stroke-width="${sw}" opacity="${op}" stroke-linecap="round"/>`;
+    html += `<circle cx="${ex}" cy="${ey}" r="${isActive?5:3}" fill="${colors[i]}" opacity="${op}"/>`;
+    const lx = cx + w[0]*scale*1.18, ly = cy - w[1]*scale*1.18;
+    html += `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="central" fill="${txtC}" style="font:${isActive?'500':'400'} 12px var(--font-sans)">W${i+1}</text>`;
+  });
+
+  if (Math.abs(enc[0]) > 0.01 || Math.abs(enc[1]) > 0.01) {
+    const hx = cx + enc[0]*scale, hy = cy - enc[1]*scale;
+    html += `<line x1="${cx}" y1="${cy}" x2="${hx}" y2="${hy}" stroke="${txtC}" stroke-width="1" stroke-dasharray="4 3"/>`;
+    html += `<circle cx="${hx}" cy="${hy}" r="4" fill="none" stroke="${txtC}" stroke-width="1.5"/>`;
+    html += `<text x="${hx+10}" y="${hy-6}" fill="${txtC}" style="font:400 11px var(--font-sans)">Wx</text>`;
+  }
+
+  svg.innerHTML = html;
+}
+
+function initBtns() {
+  const cont = document.getElementById('feat-btns');
+  for (let i = 0; i < C; i++) {
+    const btn = document.createElement('button');
+    btn.className = 'feat-btn' + (i === 0 ? ' active' : '');
+    btn.textContent = i + 1;
+    btn.onclick = () => {
+      activeFeature = i;
+      cont.querySelectorAll('.feat-btn').forEach((b,j) => b.classList.toggle('active', j===i));
+      update();
+    };
+    cont.appendChild(btn);
+  }
+}
+
+document.getElementById('mu-slider').oninput = function() {
+  mu = this.value / 100;
+  document.getElementById('mu-val').textContent = mu.toFixed(2);
+  update();
+};
+
+document.getElementById('config-sel').onchange = function() {
+  config = this.value;
+  update();
+};
+
+initBtns();
+update();
+</script>

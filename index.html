@@ -1,0 +1,2141 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+		/>
+
+		<title>Lab Meeting - Week 2 Spring 2026</title>
+
+		<link rel="stylesheet" href="dist/reset.css" />
+		<link rel="stylesheet" href="dist/reveal.css" />
+		<link rel="stylesheet" href="dist/theme/white.css" />
+		<link rel="stylesheet" href="dist/plugin/highlight/monokai.css" />
+
+		<!-- Fonts: DM Serif Display for headings, Source Sans 3 for body -->
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Source+Sans+3:ital,wght@0,300;0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+
+		<style>
+			/* ── Design Tokens ── */
+			:root {
+				--c-ink: #1a1a1a;
+				--c-body: #3a3a3a;
+				--c-muted: #7a7a7a;
+				--c-faint: #a8a8a8;
+				--c-rule: #e0e0e0;
+				--c-surface: #ffffff;
+				--c-wash: #f6f6f4;
+
+				/* Palette — muted, scientific, no neon */
+				--c-accent: #2d5a7b;
+				--c-series-1: #2d5a7b;
+				--c-series-2: #c45a3c;
+				--c-series-3: #5a8a5e;
+				--c-series-4: #8b6eae;
+				--c-series-5: #c4933f;
+
+				--font-display: 'DM Serif Display', 'Georgia', serif;
+				--font-body: 'Source Sans 3', 'Source Sans Pro', sans-serif;
+
+				--slide-padding: 30px 50px 20px;
+			}
+
+			/* ── Base Slide Layout ── */
+			.reveal .slides {
+				text-align: left;
+			}
+
+			.reveal .slides section {
+				display: flex !important;
+				flex-direction: column;
+				align-items: flex-start;
+				justify-content: flex-start;
+				height: 100%;
+				padding: var(--slide-padding);
+				box-sizing: border-box;
+			}
+
+			/* ── Typography ── */
+			.reveal h1, .reveal h2, .reveal h3, .reveal h4 {
+				font-family: var(--font-display);
+				color: var(--c-ink);
+				text-align: left;
+				text-transform: none;
+				letter-spacing: -0.01em;
+				font-weight: 400;
+			}
+
+			.reveal h1 {
+				font-size: 2.6em;
+				line-height: 1.15;
+				margin-bottom: 0.15em;
+			}
+
+			.reveal h2 {
+				font-size: 1.4em;
+				line-height: 1.1;
+				margin: 0 0 0.3em 0;
+				padding-bottom: 0.15em;
+				border-bottom: 2px solid var(--c-ink);
+				width: 100%;
+			}
+
+			.reveal h3 {
+				font-size: 1.15em;
+				line-height: 1.3;
+				color: var(--c-muted);
+				font-family: var(--font-body);
+				font-weight: 300;
+			}
+
+			.reveal p, .reveal li, .reveal span {
+				font-family: var(--font-body);
+				color: var(--c-body);
+				font-size: 0.9em;
+				line-height: 1.6;
+			}
+
+			/* ── Slide Subtitle (under h2 rule) ── */
+			.slide-subtitle {
+				font-family: var(--font-body) !important;
+				font-size: 0.65em !important;
+				font-weight: 300 !important;
+				color: var(--c-muted) !important;
+				margin-top: -0.3em;
+				margin-bottom: 1.2em;
+				letter-spacing: 0.02em;
+			}
+
+			/* ── Title Slide ── */
+			.slide-title-card {
+				justify-content: center !important;
+				padding-bottom: 60px;
+			}
+
+			.slide-title-card h1 {
+				border: none;
+				margin-bottom: 0.1em;
+			}
+
+			.slide-title-card .title-rule {
+				width: 80px;
+				height: 3px;
+				background: var(--c-accent);
+				margin: 0.45em 0 0.6em;
+				border: none;
+			}
+
+			.slide-title-card h3 {
+				font-size: 1.1em;
+				font-weight: 300;
+			}
+
+			/* ── Agenda / List ── */
+			.agenda-list {
+				list-style: none;
+				padding: 0;
+				margin: 0;
+				width: 100%;
+			}
+
+			.agenda-list li {
+				font-family: var(--font-body);
+				font-size: 0.8em;
+				font-weight: 400;
+				color: var(--c-body);
+				padding: 0.4em 0;
+				border-bottom: 1px solid var(--c-rule);
+				display: flex;
+				align-items: baseline;
+				gap: 0.7em;
+			}
+
+			.agenda-list li:last-child {
+				border-bottom: none;
+			}
+
+			.agenda-list .item-number {
+				font-family: var(--font-display);
+				font-size: 1.1em;
+				color: var(--c-accent);
+				min-width: 1.2em;
+			}
+
+			/* ── Chart Slide ── */
+			.chart-block {
+				width: 100%;
+				align-self: center;
+				flex: 1;
+				display: flex;
+				flex-direction: column;
+			}
+
+			.chart-header {
+				text-align: left;
+				margin: 0;
+			}
+
+			.chart-title {
+				font-family: var(--font-body) !important;
+				font-size: 0.6em !important;
+				font-weight: 600 !important;
+				color: var(--c-ink) !important;
+				margin: 0 0 2px 0 !important;
+				padding: 0 !important;
+				line-height: 1.1 !important;
+			}
+
+			.chart-subtitle {
+				font-family: var(--font-body) !important;
+				font-size: 0.48em !important;
+				font-weight: 300 !important;
+				color: var(--c-muted) !important;
+				margin: 0 0 6px 0 !important;
+				padding: 0 !important;
+				line-height: 1.1 !important;
+			}
+
+			.chart-area {
+				height: 380px;
+				position: relative;
+			}
+
+			.chart-legend {
+				position: absolute;
+				top: 12px;
+				left: 50px;
+				background: rgba(255, 255, 255, 0.92);
+				padding: 6px 12px;
+				display: flex;
+				gap: 16px;
+				z-index: 1;
+				font-family: var(--font-body);
+				font-size: 13px;
+				color: var(--c-body);
+			}
+
+			.chart-legend-item {
+				display: flex;
+				align-items: center;
+				gap: 6px;
+			}
+
+			.chart-legend-swatch {
+				width: 14px;
+				height: 3px;
+				border-radius: 1px;
+			}
+
+			.chart-notes {
+				font-family: var(--font-body) !important;
+				font-size: 0.42em !important;
+				font-weight: 400 !important;
+				color: var(--c-faint) !important;
+				line-height: 1.3 !important;
+				margin: 8px 0 0 0 !important;
+				padding-top: 6px;
+				border-top: 1px solid var(--c-rule);
+			}
+
+			/* ── Body Content ── */
+			.body-text {
+				font-family: var(--font-body);
+				font-size: 0.88em;
+				color: var(--c-body);
+				line-height: 1.7;
+				max-width: 85%;
+			}
+
+			/* ── Citations ── */
+			cite[data-key] {
+				font-style: normal;
+				font-family: var(--font-body);
+				font-size: 0.85em;
+				color: var(--c-accent);
+				cursor: default;
+			}
+
+			cite[data-key]::before { content: '['; }
+			cite[data-key]::after { content: ']'; }
+
+			.references-list {
+				list-style: none;
+				padding: 0;
+				margin: 0;
+				width: 100%;
+			}
+
+			.references-list li {
+				font-family: var(--font-body);
+				font-size: 0.55em;
+				color: var(--c-body);
+				line-height: 1.5;
+				padding: 0.3em 0;
+				border-bottom: 1px solid var(--c-rule);
+				display: flex;
+				gap: 0.6em;
+			}
+
+			.references-list li:last-child { border-bottom: none; }
+
+			.ref-number {
+				color: var(--c-accent);
+				font-weight: 600;
+				min-width: 1.5em;
+			}
+
+			/* ── Math Slides ── */
+			.math-body {
+				font-family: var(--font-body);
+				font-size: 0.78em;
+				color: var(--c-body);
+				line-height: 1.8;
+				width: 100%;
+			}
+
+			.math-body .MathJax { font-size: 1em !important; }
+
+			.definition-list {
+				list-style: none;
+				padding: 0 0 0 1.2em;
+				margin: 0.3em 0;
+			}
+
+			.definition-list li {
+				font-size: 1em;
+				line-height: 1.9;
+				padding: 0;
+			}
+
+			.definition-list li::before {
+				content: none;
+			}
+
+			.lemma-box {
+				background: var(--c-wash);
+				border-left: 3px solid var(--c-accent);
+				padding: 12px 18px;
+				margin: 0.5em 0;
+				width: 100%;
+				box-sizing: border-box;
+			}
+
+			.lemma-label {
+				font-family: var(--font-display);
+				font-size: 0.65em;
+				color: var(--c-accent);
+				margin: 0 0 0.2em 0;
+			}
+
+			.eq-numbered {
+				display: flex;
+				align-items: center;
+				gap: 1em;
+				margin: 0.4em 0;
+			}
+
+			.eq-numbered .eq-num {
+				font-family: var(--font-body);
+				font-size: 0.85em;
+				color: var(--c-muted);
+				margin-left: auto;
+				flex-shrink: 0;
+			}
+
+			.proof-ref {
+				font-family: var(--font-body);
+				font-size: 0.55em;
+				font-style: italic;
+				color: var(--c-muted);
+				margin-top: auto;
+			}
+
+			/* ── Two-Column Layout ── */
+			.split {
+				display: flex;
+				gap: 40px;
+				width: 100%;
+				flex: 1;
+				min-height: 0;
+				overflow: hidden;
+			}
+
+			.split-text {
+				flex: 1;
+				min-width: 0;
+			}
+
+			.split-viz {
+				flex: 1;
+				min-width: 0;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+			}
+
+			.split-viz canvas, .split-viz svg {
+				max-width: 100%;
+				max-height: 100%;
+			}
+
+			/* ── Colored Term Highlights ── */
+			.term-interaction { color: var(--c-series-2); }
+			.term-self { color: var(--c-series-1); }
+			.term-residual { color: var(--c-series-3); }
+			.term-boundary { color: var(--c-series-4); }
+			.term-full { color: var(--c-series-5); }
+
+			.term-tag {
+				display: inline-block;
+				font-family: var(--font-body);
+				font-size: 0.5em;
+				padding: 2px 8px;
+				border-radius: 3px;
+				color: white;
+				margin-right: 6px;
+				vertical-align: middle;
+			}
+
+			.term-tag.interaction { background: var(--c-series-2); }
+			.term-tag.self { background: var(--c-series-1); }
+			.term-tag.residual { background: var(--c-series-3); }
+			.term-tag.boundary { background: var(--c-series-4); }
+
+			/* ── Flow Diagram ── */
+			.flow-node {
+				font-family: var(--font-body);
+				font-size: 14px;
+				fill: var(--c-body);
+			}
+
+			.flow-box {
+				rx: 6;
+				ry: 6;
+			}
+
+			/* ── Slide Number ── */
+			.reveal .slide-number {
+				font-family: var(--font-body);
+				font-size: 0.55em;
+				font-weight: 300;
+				color: var(--c-muted);
+				background: none !important;
+			}
+
+			/* ── Fragments (Beamer-style pause) ── */
+			.reveal .slides section .fragment {
+				opacity: 0.15;
+				visibility: visible !important;
+				transition: opacity 0.2s ease;
+			}
+			.reveal .slides section .fragment.visible {
+				opacity: 1;
+			}
+			/* Disable fragments in print mode */
+			.reveal.print-pdf .slides section .fragment {
+				opacity: 1 !important;
+				visibility: visible !important;
+			}
+			/* Print: clip overflow and tighten spacing */
+			.reveal.print-pdf .slides section {
+				overflow: hidden !important;
+				padding: 20px 40px 15px !important;
+			}
+
+			/* ── Utility ── */
+			.accent { color: var(--c-accent); }
+			.muted { color: var(--c-muted); }
+			.mt-auto { margin-top: auto; }
+		</style>
+	</head>
+	<body>
+		<div class="reveal">
+			<div class="slides">
+
+				<!-- Title Slide -->
+				<section class="slide-title-card">
+					<h1>Models as Candidate Learners</h1>
+					<div class="title-rule"></div>
+					<h3>A linguist's tour of developmental interpretability<br><span class="muted" style="font-size: 0.72em;">Lab Meeting · Week 2 Spring 2026</span></h3>
+				</section>
+
+				<!--
+				== COMMENTED OUT: Demo slides ==
+
+				<section>
+					<h2>Agenda</h2>
+					<ul class="agenda-list">
+						<li><span class="item-number">01</span> Topic 1</li>
+						<li><span class="item-number">02</span> Topic 2</li>
+						<li><span class="item-number">03</span> Topic 3</li>
+					</ul>
+				</section>
+
+				<section>
+					<h2>Experiment Results</h2>
+					<div class="chart-block">
+						<div class="chart-header">
+							<p class="chart-title">Response Over Time by Treatment Group</p>
+							<p class="chart-subtitle">Weekly measurements across 6-week trial period (n=30 per group)</p>
+						</div>
+						<div class="chart-area">
+							<div class="chart-legend">
+								<span class="chart-legend-item"><span class="chart-legend-swatch" style="background: var(--c-series-1);"></span>Control</span>
+								<span class="chart-legend-item"><span class="chart-legend-swatch" style="background: var(--c-series-2);"></span>Treatment A</span>
+								<span class="chart-legend-item"><span class="chart-legend-swatch" style="background: var(--c-series-3);"></span>Treatment B</span>
+							</div>
+							<canvas id="myChart"></canvas>
+						</div>
+						<p class="chart-notes">Note: Error bars omitted for clarity.</p>
+					</div>
+				</section>
+
+				<section><h2>Model Likelihood</h2></section>
+				<section><h2>Population Loss</h2></section>
+				<section><h2>Partition Sets</h2></section>
+				<section><h2>Lemma 3.1</h2></section>
+				<section><h2>H_i^- Expansion</h2></section>
+				<section><h2>H_i^+ Expansion</h2></section>
+				<section><h2>Discussion</h2></section>
+
+				== END COMMENTED OUT ==
+				-->
+
+				<!-- ═══════════════════════════════════════
+				     ACT I: Why Do We Need a New Theory?
+				     ═══════════════════════════════════════ -->
+
+				<!-- Cold-open hook from acquisition: learners learn in stages -->
+				<section>
+					<h2>Learners Learn in Stages</h2>
+					<div class="math-body">
+						<p>The central observation of acquisition research:</p>
+						<ul>
+							<li class="fragment"><strong>Past-tense morphology.</strong> A child learns <em>went</em>, then overgeneralizes to <em>goed</em>, then recovers to <em>went</em> again — a U-shaped curve. The trickier part: they <em>retreat from the overgeneralization without anyone telling them they were wrong</em>. No explicit negative evidence.</li>
+							<li class="fragment"><strong>Wh-questions.</strong> Children pass through ordered stages — from declarative-form questions to partial inversion to full subject-aux inversion — not gradual improvement.</li>
+						</ul>
+						<p class="fragment" style="margin-top: 0.5em;">Stages, not smooth improvement. Sometimes <em>non-monotonic</em>. <strong>Decades of acquisition research has documented this as the shape of learning.</strong></p>
+					</div>
+				</section>
+
+				<!-- The Hook (reframed as the structural rhyme with acquisition) -->
+				<section>
+					<h2>And So Do Neural Networks</h2>
+					<div class="math-body">
+						<p>Three phenomena from machine learning that look strikingly familiar:</p>
+						<ul>
+							<li class="fragment"><strong>Grokking</strong> — a model memorizes, then suddenly generalizes thousands of epochs later</li>
+							<li class="fragment"><strong>Induction heads</strong> — in-context learning appears abruptly mid-training <cite data-key="olsson2022incontext"></cite></li>
+							<li class="fragment"><strong>Emergent abilities</strong> — capabilities absent in smaller models appear suddenly at scale</li>
+						</ul>
+						<p class="fragment" style="margin-top: 0.5em;">Loss plateaus, then drops. Structure appears suddenly, not incrementally — and sometimes non-monotonically.</p>
+						<p class="fragment" style="margin-top: 0.5em; font-size: 1.05em;">Same observation, different system. <strong>The shape of learning rhymes with what acquisition researchers have been describing for decades.</strong></p>
+					</div>
+				</section>
+
+				<!-- The methodological bet -->
+				<section>
+					<h2>The Bet</h2>
+					<div class="math-body">
+						<p>If models are <strong>candidate learners</strong> — traversing the same kind of stagewise developmental landscape we see in kids — then something striking follows:</p>
+						<ul>
+							<li class="fragment">They're the <strong>first learners we can fully open up</strong>. Every weight, every loss, every checkpoint is observable in a way no human learner ever will be.</li>
+							<li class="fragment">That's a <strong>methodological gift</strong> the study of acquisition has never had.</li>
+						</ul>
+						<p class="fragment" style="margin-top: 0.5em;">But to take the bet seriously, we need a framework that lets us treat "stages" in a model rigorously — when one starts, when it ends, what changes between them. <strong>Classical learning theory can't give us one.</strong></p>
+					</div>
+				</section>
+
+				<!-- Slide 1 -->
+				<section>
+					<h2>The Classical Promise</h2>
+					<div class="split">
+						<div class="split-text math-body" style="font-size: 0.68em;">
+							<p>Classical statistics demands <strong>regular</strong> models:</p>
+							<ul>
+								<li class="fragment">The map from parameters to functions is <strong>one-to-one</strong> — every parameter configuration gives a unique output</li>
+								<li class="fragment">The Fisher Information Matrix (FIM) is <strong>positive definite</strong> everywhere — the loss landscape is a smooth, convex bowl</li>
+							</ul>
+							<p class="fragment">Under these conditions, the <strong>Bernstein–von Mises theorem</strong> guarantees the posterior concentrates around a single unique minimum as data increases <cite data-key="watanabe2009algebraic"></cite>.</p>
+						</div>
+						<div class="split-viz" style="flex-direction: column; gap: 4px;">
+							<p class="chart-title" style="text-align: center; width: 100%;">Regular model geometry</p>
+							<img src="assets/classical-promise.png" alt="One-to-one mapping and convex loss bowl" style="max-height: 85%; max-width: 100%; object-fit: contain;">
+							<p class="chart-notes" style="text-align: center; border: none; margin: 0 !important; padding: 0 !important;">A marble rolling to the bottom of a perfectly smooth bowl. More data = tighter convergence.</p>
+						</div>
+					</div>
+				</section>
+
+				<!-- Slide 2 -->
+				<section>
+					<h2>Why Neural Networks Break This</h2>
+					<div class="math-body">
+						<p>Neural networks violate <em>both</em> requirements of regular models:</p>
+						<ul>
+							<li class="fragment"><strong>Permutation symmetry</strong> — swap two neurons (with their weights), same function. Millions of parameter configs → one output.</li>
+							<li class="fragment"><strong>Dead neurons</strong> — a ReLU stuck at zero lets you scale its weights arbitrarily. Parameter space is unmoored from function space.</li>
+							<li class="fragment"><strong>Fisher Information goes singular</strong> — zero eigenvalues, FIM no longer invertible, Bernstein–von Mises shatters.</li>
+						</ul>
+						<p class="fragment">The loss landscape is not a bowl — it's a <strong>sprawling valley system</strong> where wildly different parameters share the exact same loss.</p>
+					</div>
+				</section>
+
+				<!-- ═══════════════════════════════════════
+				     Chen et al. 2023
+				     ═══════════════════════════════════════ -->
+
+				<section class="slide-title-card">
+					<h1>Chen et al. 2023</h1>
+					<div class="title-rule"></div>
+					<h3>Dynamical versus Bayesian Phase Transitions<br>in a Toy Model of Superposition</h3>
+				</section>
+
+				<!-- TSM Architecture -->
+				<section>
+					<h2>The Toy Model of Superposition</h2>
+					<div class="split">
+						<div class="split-text math-body">
+							<p>A single-hidden-layer autoencoder <cite data-key="chen2023dynamical"></cite>:</p>
+							<ul>
+								<li class="fragment"><strong>6 features</strong> compressed into <strong>2 hidden dimensions</strong> — a forced bottleneck</li>
+								<li class="fragment">Encode: $h = Wx$, decode: $f(x) = \text{ReLU}(W^T h + b)$</li>
+								<li class="fragment">Goal: reconstruct $x$ from the bottleneck — but 6 features can't fit in 2 dims without overlap</li>
+							</ul>
+							<p class="fragment" style="margin-top: 0.5em;">The model must choose: which features get faithful representation, and which get compressed into <strong>superposition</strong>?</p>
+						</div>
+						<div class="split-viz" style="flex-direction: column; gap: 4px;">
+							<img src="assets/tms_autoencoder_architecture.svg" alt="TSM architecture: 6→2→6 autoencoder" style="max-height: 100%; max-width: 100%; object-fit: contain;">
+						</div>
+					</div>
+				</section>
+
+				<!-- K-gon Critical Points -->
+				<section>
+					<h2>The Phases: k-gon Solutions</h2>
+					<div class="math-body">
+						<p>The weight columns arrange as vertices of a regular polygon. Each is a distinct critical point:</p>
+					</div>
+					<div style="flex: 1; display: flex; align-items: center; justify-content: center; width: 100%; min-height: 0;">
+						<img src="assets/kgon_critical_points.svg" alt="4-gon, 5-gon, 6-gon critical points" style="max-height: 100%; max-width: 100%; object-fit: contain;">
+					</div>
+				</section>
+
+				<!-- TSM Interactive Forward Pass -->
+				<section style="padding: 10px 20px 10px;">
+					<h2 style="font-size: 1em; margin-bottom: 6px;">Interactive: Forward Pass</h2>
+					<iframe src="assets/tms_forward_pass_slide.html" style="flex: 1; width: 100%; border: none; border-radius: 4px;"></iframe>
+				</section>
+
+				<!-- SLT & LLC -->
+				<section>
+					<h2>Singular Learning Theory</h2>
+					<div class="math-body">
+						<p><strong>Watanabe (2009)</strong>: import <strong>algebraic geometry</strong> to handle singularities <cite data-key="watanabe2009algebraic"></cite>. The key tool: the <strong>Local Learning Coefficient</strong> (LLC, $\hat\lambda$) <cite data-key="lau2023local"></cite></p>
+						<ul>
+							<li>$\lambda$ = half the number of "directions that matter" — directions where changing parameters actually changes the loss</li>
+							<li><strong>Low LLC</strong> = broad flat basin, simple structure, fewer features committed</li>
+							<li><strong>High LLC</strong> = narrow sharp basin, complex structure, more features captured</li>
+						</ul>
+						<p>Simple basins are occupied first (geometrically cheaper). The model transitions to more complex ones only when the free energy trade-off tips <cite data-key="watanabe2018mathematical"></cite>.</p>
+					</div>
+				</section>
+
+				<!-- Interactive Loss Landscape -->
+				<section style="padding: 10px 20px 10px;">
+					<h2 style="font-size: 1em; margin-bottom: 6px;">Interactive: Loss Landscape</h2>
+					<iframe src="assets/loss_landscape_3d_fixed.html" style="flex: 1; width: 100%; border: none; border-radius: 4px;"></iframe>
+				</section>
+
+				<!-- Free Energy -->
+				<section>
+					<h2>Free Energy: The Governing Equation</h2>
+					<div class="math-body">
+						<div class="eq-numbered">
+							<span>$$F = \underbrace{L_n(w)}_{\text{empirical loss}} + \underbrace{\lambda(w) \cdot \frac{\log n}{n}}_{\text{complexity penalty}}$$</span>
+						</div>
+						<p>$\lambda(w)$ is the LLC, $n$ is the effective sample size (≈ training time).</p>
+						<ul>
+							<li><strong>Early training</strong> ($n$ small): complexity penalty dominates → biased toward <strong>simple</strong> basins</li>
+							<li><strong>Late training</strong> ($n$ large): penalty shrinks → can afford more complex solutions <em>if data demands it</em></li>
+						</ul>
+						<p style="margin-top: 0.3em;">The model's preferred basin changes over training. Not just minimizing loss — performing <strong>Bayesian internal model selection</strong>.</p>
+					</div>
+				</section>
+
+				<!-- Interactive Free Energy -->
+				<section style="padding: 10px 20px 10px;">
+					<h2 style="font-size: 1em; margin-bottom: 6px;">Interactive: Free Energy → Phase Proportions</h2>
+					<iframe src="assets/free_energy_to_proportions.html" style="flex: 1; width: 100%; border: none; border-radius: 4px;"></iframe>
+				</section>
+
+				<!-- Interactive Opposing Staircases -->
+				<section style="padding: 10px 20px 10px;">
+					<h2 style="font-size: 1em; margin-bottom: 6px;">Interactive: Opposing Staircases</h2>
+					<iframe src="assets/tms_sgld_opposing_staircases.html" style="flex: 1; width: 100%; border: none; border-radius: 4px;"></iframe>
+				</section>
+
+				<!-- Bayesian vs SGD with 6-gon -->
+				<section style="padding: 10px 20px 10px;">
+					<h2 style="font-size: 1em; margin-bottom: 6px;">Interactive: Bayesian vs SGD Transitions</h2>
+					<iframe src="assets/full_bayesian_with_6gon.html" style="flex: 1; width: 100%; border: none; border-radius: 4px;"></iframe>
+				</section>
+
+				<!--
+				== COMMENTED OUT: Phase Transitions, Grokking, Direction/Data,
+				SGLD, Dynamical vs Bayesian, Results, Hoogland content,
+				Lee content, Subset Principle content ==
+				-->
+
+				<!-- Chen summary / bridge to Hoogland -->
+				<section>
+					<h2>What Did Chen et al. Find?</h2>
+					<div class="math-body" style="font-size: 0.68em;">
+						<p><strong>Investigated:</strong> In a toy model where the loss landscape is fully analytically tractable, how do phase transitions actually work — and does Bayesian model selection (the theory) match what SGD does (the practice)?</p>
+						<p class="fragment"><strong>Found:</strong></p>
+						<ul>
+							<li class="fragment">The superposition model's loss landscape decomposes into <strong>discrete k-gon basins</strong>, each with a distinct LLC</li>
+							<li class="fragment">Free energy $F = L_n + \lambda \cdot \frac{\log n}{n}$ governs which basin is preferred — early training favors low-$\lambda$ (simple), late training tolerates high-$\lambda$ (complex) only if the data demands it</li>
+							<li class="fragment">Both <strong>Bayesian sampling</strong> and <strong>SGD</strong> exhibit discrete, stepwise transitions between basins — and in the <em>same order</em></li>
+							<li class="fragment">The signature: <strong>opposing staircases</strong> — loss drops in steps while LLC rises in steps</li>
+						</ul>
+						<p class="fragment"><strong>Tells us:</strong> SLT doesn't just describe singular models in the abstract — it makes concrete, observable predictions about how learning unfolds. Even SGD, which has nothing to do with Bayesian sampling, follows the free-energy script.</p>
+					</div>
+				</section>
+
+				<!-- Bridge: predictions for real models -->
+				<section>
+					<h2>Three Predictions for Real Models</h2>
+					<div class="math-body" style="font-size: 0.68em; line-height: 1.55;">
+						<p>If Chen et al. is right that SLT governs real learning — not just an analytically tractable toy — then in a real transformer trained on real data, we should see:</p>
+						<ul class="agenda-list">
+							<li class="fragment"><span class="item-number">1</span> <strong>Discrete LLC jumps</strong>, not smooth growth — training proceeds in stages, and the LLC marks where they begin and end</li>
+							<li class="fragment"><span class="item-number">2</span> <strong>Jumps aligned with new capabilities</strong> — each LLC transition should correspond to something the model can newly do</li>
+							<li class="fragment"><span class="item-number">3</span> <strong>The opposing-staircase signature</strong> — loss falls stepwise as LLC rises stepwise, just like the toy model</li>
+						</ul>
+						<p class="fragment" style="margin-top: 0.4em;">These are testable. To test them, we need a way to <em>measure</em> the LLC in models too large to enumerate — and a behavioral framework for asking whether each transition <em>means</em> anything.</p>
+						<p class="fragment" style="margin-top: 0.3em;"><strong>Hoogland et al. (2024) set out to do exactly this.</strong></p>
+					</div>
+				</section>
+
+				<!-- Hoogland title card -->
+				<section class="slide-title-card">
+					<h1>Hoogland et al. 2024</h1>
+					<div class="title-rule"></div>
+					<h3>Loss Landscape Degeneracy and<br>Stagewise Development in Transformers</h3>
+				</section>
+
+				<!-- Hoogland intro -->
+				<section>
+					<h2>Scaling to Richer Environments</h2>
+					<div class="math-body">
+						<p>The toy superposition model has a clean, analytically tractable loss landscape. Do the same stagewise dynamics appear in more complex training environments? <cite data-key="hoogland2024stagewise"></cite></p>
+						<ul>
+							<li class="fragment">Hoogland et al. train a <strong>2-layer transformer</strong> and track its development using SLT measures alongside behavioral tasks</li>
+							<li class="fragment">Two settings: <strong>language modeling</strong> (trained on The Pile) and <strong>in-context linear regression</strong></li>
+							<li class="fragment">Central question: do SLT-predicted phase transitions correspond to <strong>observable changes in what the model can do</strong>?</li>
+						</ul>
+						<p class="fragment" style="margin-top: 0.3em;">To do this, we need a complexity measure that can differentiate between types of degeneracy — not just "is it flat?" but "how flat, and in what way?"</p>
+					</div>
+				</section>
+
+				<!-- Hessian Blindness -->
+				<section style="padding: 10px 20px 10px;">
+					<h2 style="font-size: 1em; margin-bottom: 6px;">Interactive: Why Hessians Fail</h2>
+					<iframe src="assets/hessian_blindness_interactive.html" style="flex: 1; width: 100%; border: none; border-radius: 4px;"></iframe>
+				</section>
+
+				<!-- SGLD LLC Estimator -->
+				<section style="padding: 10px 20px 10px;">
+					<h2 style="font-size: 1em; margin-bottom: 6px;">Interactive: SGLD Estimates the LLC</h2>
+					<iframe src="assets/sgld_llc_estimator.html" style="flex: 1; width: 100%; border: none; border-radius: 4px;"></iframe>
+				</section>
+
+				<!-- Language Modeling subsection -->
+				<section class="slide-title-card">
+					<h1>Language Modeling</h1>
+					<div class="title-rule"></div>
+					<h3>Stagewise Development on The Pile</h3>
+				</section>
+
+				<!-- LM overview charts -->
+				<section>
+					<h2>Opposing Staircases in a Transformer</h2>
+					<div class="split" style="align-items: center;">
+						<div class="split-viz" style="justify-content: center;">
+							<div style="text-align: center;">
+								<p class="chart-title">Test Loss &amp; LLC over Training</p>
+								<img src="assets/model_loss.png" style="max-width: 90%; max-height: 55%;">
+							</div>
+						</div>
+						<div class="split-viz" style="justify-content: center;">
+							<div style="text-align: center;">
+								<p class="chart-title">LLC Curve Derivative</p>
+								<img src="assets/lambda_derivative.png" style="max-width: 70%; max-height: 45%;">
+							</div>
+						</div>
+					</div>
+				</section>
+
+				<!-- LM1 -->
+				<section>
+					<h2>Stage LM1: Bigram Statistics</h2>
+					<div class="split" style="align-items: center;">
+						<div class="split-text math-body">
+							<p><strong>(a)</strong> The model's bigram score drops toward bigram entropy (dashed) — it learns raw token co-occurrence statistics. No sequence awareness yet.</p>
+							<p><strong>(b)</strong> Test loss tracks the position-ablated loss closely — removing positional information makes no difference. The model isn't using word order.</p>
+							<p class="muted" style="font-size: 0.6em; margin-top: 0.3em;">Colored bands mark phase transitions identified by LLC jumps.</p>
+						</div>
+						<div class="split-viz" style="justify-content: center;">
+							<div style="text-align: center;">
+								<p class="chart-title">Bigram Score &amp; Position Ablation</p>
+								<img src="assets/LM1-Charts.png" style="max-width: 100%; max-height: 85%;">
+								<p class="chart-notes" style="border: none; margin: 2px 0 0 !important; padding: 0 !important;">x-axis: training steps</p>
+							</div>
+						</div>
+					</div>
+				</section>
+
+				<!-- LM2 -->
+				<section>
+					<h2>Stage LM2: Positional Awareness</h2>
+					<div class="split" style="align-items: center;">
+						<div class="split-text math-body">
+							<p><strong>(c)</strong> N-gram scores diverge from baseline — the model begins exploiting <strong>word order</strong>. 3-grams and 4-grams climb steeply after the first transition.</p>
+							<p>Test loss separates from position-ablated loss: positional information now matters. The model has developed <strong>sequence awareness</strong>.</p>
+						</div>
+						<div class="split-viz" style="justify-content: center;">
+							<div style="text-align: center;">
+								<p class="chart-title">N-gram Performance Over Training</p>
+								<img src="assets/LM2-Charts.png" style="max-width: 100%; max-height: 85%;">
+								<p class="chart-notes" style="border: none; margin: 2px 0 0 !important; padding: 0 !important;">x-axis: training steps</p>
+							</div>
+						</div>
+					</div>
+				</section>
+
+				<!-- LM3-4-5 -->
+				<section>
+					<h2>Stages LM3–5: Circuits Assemble</h2>
+					<div class="split" style="align-items: center; min-height: 0; overflow: hidden;">
+						<div class="split-text math-body" style="font-size: 0.72em;">
+							<p><strong>(d)</strong> Previous token heads (layer 1) activate — foundational building blocks.</p>
+							<p><strong>(e)</strong> Induction heads (layer 2) wire in — in-context learning emerges.</p>
+							<p><strong>(f)</strong> ICL score improves as induction heads connect: "A B ... A → B" pattern completion <cite data-key="olsson2022incontext"></cite>.</p>
+							<p class="muted" style="font-size: 0.55em;">Each circuit forms at a specific LLC transition — ordered, prerequisite-based.</p>
+						</div>
+						<div class="split-viz" style="justify-content: center;">
+							<div style="text-align: center;">
+								<p class="chart-title">Attention Head &amp; ICL Scores</p>
+								<img src="assets/LM345-Charts.png" style="max-width: 100%; max-height: 70%;">
+								<p class="chart-notes" style="border: none; margin: 2px 0 0 !important; padding: 0 !important;">x-axis: training steps</p>
+							</div>
+						</div>
+					</div>
+				</section>
+
+				<!-- Regression subsection -->
+				<section class="slide-title-card">
+					<h1>In-Context Regression</h1>
+					<div class="title-rule"></div>
+					<h3>Transient Structures &amp; the Ridge→DMMSE Transition</h3>
+				</section>
+
+				<!-- LR setup -->
+				<section>
+					<h2>The Task</h2>
+					<div class="split" style="align-items: center;">
+						<div class="split-viz">
+							<img src="assets/lr_architecture.svg" style="width: 100%; height: auto; transform: scale(1.2); transform-origin: center;">
+						</div>
+						<div class="split-viz">
+							<img src="assets/lr_data_generation.svg" style="width: 100%; height: auto; transform: scale(1.2); transform-origin: center;">
+						</div>
+					</div>
+				</section>
+
+				<!-- LR training loss -->
+				<section>
+					<h2>Training on In-Context Regression</h2>
+					<p class="math-body" style="margin-bottom: 0.2em;">The transformer sees (x, y) pairs from a noisy linear function $y = t^\top x + \varepsilon$ and must predict each $y_i$ from preceding context. Per-token loss drops in <strong>stages</strong> — each corresponding to a new regression strategy.</p>
+					<div style="flex: 1; display: flex; align-items: center; justify-content: center; width: 100%; min-height: 0;">
+						<img src="assets/lr_training_loss.svg" style="max-width: 100%; max-height: 100%;">
+					</div>
+				</section>
+
+				<!-- LR task interactive -->
+				<section style="padding: 10px 20px 10px;">
+					<h2 style="font-size: 1em; margin-bottom: 6px;">Interactive: In-Context Regression Task</h2>
+					<iframe src="assets/lr_task_combined.html" style="flex: 1; width: 100%; border: none; border-radius: 4px;"></iframe>
+				</section>
+
+				<!-- Regression 2D/3D interactive (commented out)
+				<section style="padding: 10px 20px 10px;">
+					<h2 style="font-size: 1em; margin-bottom: 6px;">Interactive: Regression Geometry</h2>
+					<iframe src="assets/regression_2d_3d_slide.html" style="flex: 1; width: 100%; border: none; border-radius: 4px;"></iframe>
+				</section>
+				-->
+
+				<!-- LR loss + LLC curves -->
+				<section>
+					<h2>Opposing Staircases in Regression</h2>
+					<div class="split" style="align-items: center;">
+						<div class="split-text math-body" style="font-size: 0.68em;">
+							<p>Loss shows a large initial drop (LR1–LR2), then steady decrease through LR3–LR5.</p>
+							<p class="fragment">LLC tracks loss early — complexity rises as loss falls (LR1–LR3). The model is building structure to solve the task.</p>
+							<p class="fragment">But in <strong>LR4–LR5</strong>, LLC <em>decreases</em> while loss continues to fall. The model is <strong>shedding complexity</strong> — simplifying its internal algorithm while still improving.</p>
+							<p class="fragment">Opposite direction from the toy model — the signature of a transient structure being replaced.</p>
+						</div>
+						<div class="split-viz" style="justify-content: center;">
+							<div style="text-align: center;">
+								<img src="assets/lr_loss.png" style="max-width: 100%; max-height: 90%;">
+							</div>
+						</div>
+					</div>
+				</section>
+
+				<!-- LR main (a): position-invariant representations -->
+				<section>
+					<h2>LR1: Position-Invariant Predictions</h2>
+					<div class="split" style="align-items: center;">
+						<div class="split-text math-body" style="font-size: 0.68em;">
+							<p><strong>(a)</strong> Per-token prediction norms $\mathbb{E}[\|\hat{y}_k\|^2]$ across context positions $k$.</p>
+							<p class="fragment">Initially, the model predicts <strong>zero at all positions</strong> — the safest prior when you know nothing about the task.</p>
+							<p class="fragment">As training progresses, predictions grow, but remain <strong>position-invariant</strong> early on: the model hasn't yet learned that later positions (more context) should produce better predictions.</p>
+						</div>
+						<div class="split-viz" style="justify-content: center;">
+							<img src="assets/lr_main.png" style="max-width: 100%; max-height: 90%;">
+						</div>
+					</div>
+				</section>
+
+				<!-- LR main (b): ICL performance + OOD -->
+				<section>
+					<h2>LR2–3: In-Context Learning Emerges</h2>
+					<div class="split" style="align-items: center;">
+						<div class="split-text math-body" style="font-size: 0.68em;">
+							<p><strong>(b)</strong> In-context learning score across training, evaluated at different levels of distributional shift ($g$).</p>
+							<p class="fragment">$g = 1$ is the training distribution. Higher $g$ = inputs drawn from a wider distribution — testing <strong>out-of-distribution generalization</strong>.</p>
+							<p class="fragment">In LR2, ICL performance improves across <em>all</em> $g$ values — the model learns a general regression algorithm that transfers to unseen scales.</p>
+							<p class="fragment">This is the <strong>ridge regression</strong> phase — a simple, robust algorithm that generalizes broadly.</p>
+						</div>
+						<div class="split-viz" style="justify-content: center;">
+							<img src="assets/lr_main.png" style="max-width: 100%; max-height: 90%;">
+						</div>
+					</div>
+				</section>
+
+				<!-- LR main (b) continued: complexity drop + OOD loss -->
+				<section>
+					<h2>LR4–5: Specialization Costs Generalization</h2>
+					<div class="split" style="align-items: center;">
+						<div class="split-text math-body" style="font-size: 0.68em;">
+							<p>As the model loses complexity (LLC drops in LR4–5), it begins to lose <strong>out-of-distribution ICL performance</strong> as well.</p>
+							<p class="fragment">Higher $g$ values degrade first — the model is specializing to the training distribution at the expense of general-purpose regression.</p>
+							<p class="fragment">The transient ridge solution is being <strong>dismantled and replaced</strong> by a narrower algorithm tuned to the specific training data.</p>
+						</div>
+						<div class="split-viz" style="justify-content: center;">
+							<div style="text-align: center; position: relative;">
+								<img src="assets/lr_main.png" style="max-width: 100%; max-height: 70%;">
+								<img src="assets/lr_main_small.png" style="position: absolute; bottom: 0; left: 0; width: 45%; border: 1px solid #e0e0e0; border-radius: 4px; background: #fff;">
+							</div>
+						</div>
+					</div>
+				</section>
+
+				<!-- LR main (c): layer-norm collapse -->
+				<section>
+					<h2>Layer-Norm Collapse</h2>
+					<div class="split" style="align-items: center;">
+						<div class="split-text math-body" style="font-size: 0.68em;">
+							<p><strong>(c)</strong> Layer-norm weights over training.</p>
+							<p class="fragment">In LR4–5, layer-norm weights <strong>collapse toward zero</strong> for many dimensions.</p>
+							<p class="fragment">This directly corresponds to the LLC decrease — fewer active dimensions means fewer "directions that matter" in parameter space.</p>
+							<p class="fragment">The model is effectively <strong>pruning its own capacity</strong>, trading the general-purpose ridge solution for a specialized one with fewer degrees of freedom.</p>
+						</div>
+						<div class="split-viz" style="justify-content: center;">
+							<img src="assets/lr_main.png" style="max-width: 100%; max-height: 90%;">
+						</div>
+					</div>
+				</section>
+
+				<!-- LR embedding collapse -->
+				<section>
+					<h2>Embedding Collapse</h2>
+					<div class="math-body" style="font-size: 0.6em; line-height: 1.45;">
+						<p style="margin-bottom: 0.2em;">During LR4–5, the token embeddings reorganize:</p>
+						<ul style="margin-bottom: 0.15em;">
+							<li class="fragment"><strong>(a)</strong> Token embedding singular values collapse — the orthogonal $y$ representation merges into the input embedding space</li>
+							<li class="fragment"><strong>(b)</strong> Positional encoding similarly compresses — position-specific structure is shed</li>
+							<li class="fragment"><strong>(c)</strong> Cosine similarity between $W_{\text{embed}}$ and $W_{\text{postn}}$ rises — subspaces align into a <strong>simpler joint representation</strong></li>
+						</ul>
+						<p class="fragment">Orthogonality traded for compression: tighter fit to training, less OOD capacity.</p>
+					</div>
+					<div style="flex: 1; display: flex; align-items: center; justify-content: center; width: 100%; min-height: 0;">
+						<img src="assets/lr_embed.png" style="max-width: 105%; max-height: 100%;">
+					</div>
+				</section>
+
+				<!-- Hoogland summary -->
+				<section>
+					<h2>What Did Hoogland et al. Find?</h2>
+					<div class="math-body" style="font-size: 0.68em;">
+						<p><strong>Investigated:</strong> Whether SLT-predicted phase transitions correspond to observable changes in model behavior — in both language modeling and in-context regression.</p>
+						<p class="fragment"><strong>Found:</strong></p>
+						<ul>
+							<li class="fragment">Training proceeds in <strong>discrete stages</strong>, identifiable by LLC dynamics, in both settings</li>
+							<li class="fragment">In LMs: stages align with bigrams → positional awareness → previous token heads → induction heads</li>
+							<li class="fragment">In regression: the model builds a <strong>general-purpose algorithm</strong> (ridge), then <strong>dismantles it</strong> in favor of a specialized one — a transient structure</li>
+							<li class="fragment">LLC can <em>decrease</em> during training (LR4–5), contradicting the toy model prediction — the theory needs to account for this</li>
+						</ul>
+						<p class="fragment"><strong>Tells us:</strong> Development is real, observable, and structured. The LLC is a reliable signal for when to look — the behavioral probes tell you what happened.</p>
+					</div>
+				</section>
+
+				<!-- Methodology takeaways -->
+				<section>
+					<h2>A Recipe for Developmental Analysis</h2>
+					<div class="math-body" style="font-size: 0.65em; line-height: 1.55;">
+						<ul class="agenda-list">
+							<li><span class="item-number">1</span><span><strong>Pick a theoretically grounded measure.</strong> Not loss, not accuracy — something that captures structural properties. The LLC comes from SLT, but the principle extends: choose a measure with foundations that tells you what the loss curve can't.</span></li>
+							<li class="fragment"><span class="item-number">2</span><span><strong>Track it developmentally.</strong> Measure throughout training at sufficient density. Log-spaced checkpoints — development is faster early, slower late.</span></li>
+							<li class="fragment"><span class="item-number">3</span><span><strong>Let the measure define the stages.</strong> Don't impose stages from behavioral observations. Let the measure's own dynamics (LLC derivative zero-crossings) partition training. Unsupervised, setting-agnostic.</span></li>
+							<li class="fragment"><span class="item-number">4</span><span><strong>Validate with behavioral probes.</strong> Now look at what changed at each boundary. Design probes, run ablations. The measure told you <strong>when</strong>. The analysis tells you <strong>what</strong>.</span></li>
+							<li class="fragment"><span class="item-number">5</span><span><strong>Interrogate the gap between theory and data.</strong> The theory predicted LLC-increasing transitions. The data showed LLC-decreasing ones too. That mismatch is the most valuable finding — it's where the theory needs to grow.</span></li>
+						</ul>
+					</div>
+				</section>
+
+				<!-- Linguist's notes -->
+				<section>
+					<h2>A Linguist's Note</h2>
+					<div class="math-body" style="font-size: 0.68em;">
+						<p>The regression results demonstrate something striking from a language acquisition perspective:</p>
+						<p class="fragment">The model is effectively <strong>solving the subset problem</strong> — even if maladaptively. It finds a general solution first, then without negative evidence, free-energy dynamics and optimizer noise push it <em>out</em> of a superset solution and <em>into</em> a subset of the problem.</p>
+						<p class="fragment">The trajectory — <strong>zero → generalize → sub-generalize</strong> — mirrors a Chomskyan approach to parameter setting, which posits that learners progress through a <strong>none → all → some</strong> pattern.</p>
+						<p class="fragment">This is a general learner navigating its way <em>out</em> of the poverty-of-the-stimulus problem — free energy dynamics and optimizer noise provide the mechanism to escape overly general minima, without requiring negative evidence. The geometry of the hypothesis space does the work.</p>
+					</div>
+				</section>
+
+				<!-- Lee title card -->
+				<section class="slide-title-card">
+					<h1>Lee et al. 2025</h1>
+					<div class="title-rule"></div>
+					<h3>Influence Dynamics and<br>Stagewise Data Attribution</h3>
+				</section>
+
+				<!-- Bridge: what we have, what's missing, where Lee tests it -->
+				<section>
+					<h2>Testing the Story on Two Models</h2>
+					<div class="math-body" style="font-size: 0.72em;">
+						<p>Chen et al. and Hoogland et al. give us a complete picture of <em>when</em> transitions happen and <em>how complex</em> the model becomes. The LLC marks the boundaries; the Recipe tells us how to act on them.</p>
+						<p>What's still missing: <em>which data</em> drives the transitions? Lee et al. take this question to two settings:</p>
+						<ul>
+							<li class="fragment"><strong>A controlled toy model</strong> — Saxe et al.'s deep linear network learning hierarchical concepts. Analytical ground truth, known developmental stages, a clean story we can unpack end-to-end.</li>
+							<li class="fragment"><strong>A real language model</strong> — Pythia 14M on The Pile, the same setting Hoogland and Tigges studied. Does the framework survive contact with a real transformer?</li>
+						</ul>
+						<p class="fragment">If influence dynamics align with the LLC-detected transitions, we have a unified picture: the LLC tells us <em>when</em>, the BIF tells us <em>which</em>.</p>
+					</div>
+				</section>
+
+				<!-- ════════════════════════════════════════
+				     Toy Model Demo (~8 min)
+				     The toy model is the vehicle for introducing the BIF.
+				     ════════════════════════════════════════ -->
+
+				<!-- Toy model subsection title -->
+				<section class="slide-title-card">
+					<h1>Toy Model</h1>
+					<div class="title-rule"></div>
+					<h3>Hierarchical Concept Learning</h3>
+				</section>
+
+				<!-- Brief setup of the Saxe toy model before showing data -->
+				<section>
+					<h2>The Saxe Toy Model</h2>
+					<div class="math-body" style="font-size: 0.72em;">
+						<p>From Saxe, McClelland &amp; Ganguli 2019: a <strong>2-layer deep linear neural network</strong> that learns to map item identity (a one-hot vector) to a vector of features <cite data-key="saxe2019semantic"></cite>.</p>
+						<ul>
+							<li class="fragment">The dataset has <strong>hierarchical structure</strong> — items inherit features from their categories at multiple levels (living → plant/animal → tree/flower/bird/mammal → individual)</li>
+							<li class="fragment"><strong>Analytically tractable</strong> — the learning dynamics have a closed-form solution in terms of the data covariance's singular value decomposition</li>
+							<li class="fragment">A <strong>known developmental story</strong> — Saxe showed the network learns categorical distinctions in <em>stages</em>, ordered from coarsest to finest, via singular-mode-by-singular-mode emergence</li>
+						</ul>
+						<p class="fragment" style="margin-top: 0.4em;">Concretely, what does the data and the network look like?</p>
+					</div>
+				</section>
+
+				<!-- Toy model setup -->
+				<section>
+					<h2>The Toy Model: Hierarchical Concepts</h2>
+					<div style="display: flex; flex-direction: row; gap: 20px; flex: 1; width: 100%; min-height: 0;">
+						<div style="flex: 0 0 44%; display: flex; align-items: center; justify-content: center; min-width: 0;">
+							<img src="assets/toy_model_data_hierarchy.svg" alt="Hierarchical concept tree (living → plant/animal → tree/flower/bird/mammal → individual items)" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+						</div>
+						<div style="flex: 1; min-width: 0; display: flex;">
+							<iframe src="assets/toy_model_item_encoding.html" style="flex: 1; width: 100%; height: 100%; border: none; border-radius: 4px;"></iframe>
+						</div>
+					</div>
+				</section>
+
+				<!-- What Saxe's classical analysis already told us, leading into BIF -->
+				<section>
+					<h2>What Saxe Already Told Us</h2>
+					<div class="split" style="align-items: center;">
+						<div class="split-text math-body" style="font-size: 0.68em;">
+							<p>The data has a clear <strong>similarity structure</strong> — because items inherit features hierarchically, the item-by-item similarity matrix shows nested blocks (animals vs plants, then mammals vs birds, ...).</p>
+							<p>Saxe et al. showed the network learns these distinctions in <strong>stages</strong> as loss decreases — first the coarsest split, then progressively finer ones, ending at item-level differentiation <cite data-key="saxe2019semantic"></cite>.</p>
+							<p class="fragment">This tells us <em>when</em> categorical distinctions emerge. But it doesn't tell us about the <em>dynamics between items</em> at each stage — which items are competing for representational room, which are being held together. <strong>That's what BIF can show us.</strong></p>
+						</div>
+						<div class="split-viz" style="justify-content: center;">
+							<img src="assets/classical_toy.png" alt="Item similarity matrix and Saxe's classical stages of differentiation as loss decreases" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+						</div>
+					</div>
+				</section>
+
+				<!-- Why classical IF doesn't work here (simplified) -->
+				<section>
+					<h2>Why Not Classical Influence Functions?</h2>
+					<div class="math-body" style="font-size: 0.74em;">
+						<p>The classical influence function <cite data-key="koh2017understanding"></cite> hands you one number per (sample, observable) pair, computed at the end of training:</p>
+						<div class="eq-numbered">
+							<span>$$\text{IF}(z_i, \phi) \;=\; -\,\underbrace{\nabla\phi(w^*)^\top}_{\text{gradient of observable}}\;\underbrace{H^{-1}(w^*)}_{\text{inverse Hessian}}\;\underbrace{\nabla\ell_i(w^*)}_{\text{loss gradient of sample } z_i}$$</span>
+						</div>
+						<ul>
+							<li class="fragment">The <strong>inverse Hessian</strong> doesn't exist in singular models — the same Hessian-blindness we hit in the Hoogland section</li>
+							<li class="fragment">The <strong>single number</strong> assumes influence is static — but in stagewise learning, a sample's role changes over training</li>
+						</ul>
+						<p class="fragment">We need something <strong>Hessian-free</strong> and <strong>defined throughout training</strong>.</p>
+					</div>
+				</section>
+
+				<!-- BIF intuition (simplified, with intuition SVG) -->
+				<section>
+					<h2>Bayesian Influence Functions: The Intuition</h2>
+					<div class="split" style="align-items: stretch;">
+						<div class="split-text math-body" style="font-size: 0.7em;">
+							<p>At any checkpoint, ask a simple question: <em>if the weights were slightly different, would dog's loss and cat's loss move in the same direction?</em></p>
+							<p><strong>SGLD</strong> samples nearby weight configurations. At each, you measure both losses. Their <strong>covariance</strong> across the sample <em>is</em> the BIF <cite data-key="lee2025influence"></cite>.</p>
+							<p class="fragment">No Hessian inverse. Well-defined at any checkpoint. And mathematically, it's a <strong>susceptibility</strong> — the kind of quantity that diverges at phase transitions.</p>
+						</div>
+						<div class="split-viz" style="flex-direction: column; gap: 4px; justify-content: center;">
+							<img src="assets/bif_intuition_before_math.svg" alt="Intuition: jiggle the weights with SGLD, measure dog's and cat's loss at each, take the covariance" style="max-height: 100%; max-width: 100%; object-fit: contain;">
+						</div>
+					</div>
+				</section>
+
+				<!-- BIF mechanics: loss table → pair scores → covariance -->
+				<section>
+					<h2>How the BIF Is Computed, Mechanically</h2>
+					<div style="display: flex; flex-direction: row; gap: 16px; flex: 1; width: 100%; min-height: 0;">
+						<div style="flex: 1; display: flex; align-items: center; justify-content: center; min-width: 0;">
+							<img src="assets/bif_loss_table_to_pairs.svg" alt="Loss table from SGLD samples reduced to per-pair scores" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+						</div>
+						<div style="flex: 1; display: flex; align-items: center; justify-content: center; min-width: 0;">
+							<img src="assets/bif_covariance_calculation_detail.svg" alt="Detailed covariance computation for a single pair" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+						</div>
+					</div>
+				</section>
+
+				<!-- Two predictions (moved from Lee theory section) -->
+				<section>
+					<h2>Two Predictions for Influence Dynamics</h2>
+					<div class="math-body" style="font-size: 0.68em; line-height: 1.55;">
+						<p>If influence is a susceptibility, then at a phase transition where the posterior splits between two phases $\mathcal{U}$ and $\mathcal{V}$, decomposing the BIF via the <strong>law of total covariance</strong> gives two concrete predictions:</p>
+						<ul class="agenda-list">
+							<li class="fragment"><span class="item-number">1</span><span><strong>Influence can flip sign.</strong> The "within-phase" influence may differ between $\mathcal{U}$ and $\mathcal{V}$ — so a sample that <em>helps</em> learning before a transition can <em>hurt</em> learning after, or vice versa.</span></li>
+							<li class="fragment"><span class="item-number">2</span><span><strong>Influence peaks at transitions.</strong> The "between-phase" term is maximized when posterior mass is split 50/50, and its magnitude scales with how strongly the two phases <em>disagree</em> on the sample. Peaks identify the samples that <em>characterize</em> a given transition.</span></li>
+						</ul>
+						<p class="fragment" style="margin-top: 0.4em;">These are the signatures to look for as we walk through the toy model dynamics.</p>
+					</div>
+				</section>
+
+				<!-- Result announcement: both predictions hold in the toy model -->
+				<section>
+					<h2>Sign Flips Track the Hierarchy</h2>
+					<div class="math-body" style="font-size: 0.7em;">
+						<ul>
+							<li class="fragment"><strong>Sign flips happen</strong> — pairs reverse their influence relationship at each developmental boundary</li>
+							<li class="fragment"><strong>Peaks line up with stages</strong> — maximum influence between two items occurs exactly when the boundary between them is forming</li>
+							<li class="fragment"><strong>BIF agrees with LOO retraining</strong> — the rightmost panel reproduces the dynamics from a full leave-one-out training sweep</li>
+						</ul>
+					</div>
+					<div style="flex: 1; display: flex; align-items: center; justify-content: center; width: 100%; min-height: 0;">
+						<img src="assets/typesofinfluences.png" alt="BIF (left/center) reproduced by LOO retraining (right) — sign flips and peaks line up with stagewise learning" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+					</div>
+				</section>
+
+				<!-- Stage 0: a single low-dimensional axis -->
+				<section>
+					<h2>Stage 0: A Single Animacy Axis</h2>
+					<div class="math-body" style="font-size: 0.66em; flex: 0 0 auto; min-height: 22%;">
+						<ul>
+							<li>One low-dimensional explanation captures every item — roughly, <em>is_living</em></li>
+							<li>No category splits yet; influence between items is small and uniform</li>
+							<li>Nothing yet for developmental pressure to push against</li>
+						</ul>
+					</div>
+					<div style="flex: 1; display: flex; align-items: center; justify-content: center; width: 100%; min-height: 0;">
+						<img src="assets/toy_stages.png" alt="Toy model Stage 0: a single animacy axis" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+					</div>
+				</section>
+
+				<!-- Stage 1: animal vs plant — pressure and relief -->
+				<section>
+					<h2>Stage 1: Animal vs. Plant</h2>
+					<div class="math-body" style="font-size: 0.66em; flex: 0 0 auto; min-height: 22%;">
+						<ul>
+							<li>With <strong>dog</strong> as reference, <em>lily</em> sits in <strong>developmental pressure</strong> — both susceptible, both deserve to differ</li>
+							<li><em>Cat</em> sits in <strong>developmental relief</strong> — covary, held together while the model anticipates the category split</li>
+							<li>Split resolves dog–lily pressure; cat–dog relief persists (same category, no need to differentiate yet)</li>
+						</ul>
+					</div>
+					<div style="flex: 1; display: flex; align-items: center; justify-content: center; width: 100%; min-height: 0;">
+						<img src="assets/toy_stages.png" alt="Toy model Stage 1: animal vs plant split" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+					</div>
+				</section>
+
+				<!-- Stage 2: mammal vs bird -->
+				<section>
+					<h2>Stage 2: Mammal vs. Bird</h2>
+					<div class="math-body" style="font-size: 0.66em; flex: 0 0 auto; min-height: 22%;">
+						<ul>
+							<li>Initially the animal split is enough — parrot and dog co-exist on the same side</li>
+							<li><em>Parrot</em> enters <strong>negative covariance</strong> with dog → pressure on the mammal/bird boundary</li>
+							<li>Model splits along mammal/bird; cat–dog relief still persists</li>
+						</ul>
+					</div>
+					<div style="flex: 1; display: flex; align-items: center; justify-content: center; width: 100%; min-height: 0;">
+						<img src="assets/toy_stages.png" alt="Toy model Stage 2: mammal vs bird split" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+					</div>
+				</section>
+
+				<!-- Stage 3: individual items + closing -->
+				<section>
+					<h2>Stage 3: Each Item Alone</h2>
+					<div class="math-body" style="font-size: 0.66em; flex: 0 0 auto; min-height: 22%;">
+						<ul>
+							<li>Cat–dog relief finally flips into <strong>pressure</strong> — the covariant pocket has become a strained gradient</li>
+							<li>Model splits the parameter space one last time</li>
+							<li>Each item now in its own gradient space — no more inter-item influence; the developmental story is complete</li>
+						</ul>
+					</div>
+					<div style="flex: 1; display: flex; align-items: center; justify-content: center; width: 100%; min-height: 0;">
+						<img src="assets/toy_stages.png" alt="Toy model Stage 3: individual item splits" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+					</div>
+				</section>
+
+				<!-- Interactive: stepwise BIF computation across training phases -->
+				<section style="padding: 10px 20px 10px;">
+					<h2 style="font-size: 1em; margin-bottom: 6px;">Interactive: BIF Across Training Phases</h2>
+					<iframe src="assets/bif_equation_stepwise_then_combined.html" style="flex: 1; width: 100%; border: none; border-radius: 4px;"></iframe>
+				</section>
+
+				<!-- ════════════════════════════════════════
+				     Language Models (~5 min)
+				     ════════════════════════════════════════ -->
+
+				<!-- LM subsection title -->
+				<section class="slide-title-card">
+					<h1>Language Models</h1>
+					<div class="title-rule"></div>
+					<h3>BIF on Pythia 14M</h3>
+				</section>
+
+				<!-- LM intro: setup the question and the test bed -->
+				<section>
+					<h2>Does It Scale to a Real Transformer?</h2>
+					<div class="math-body" style="font-size: 0.72em;">
+						<p>The toy model showed BIF tracking exactly the developmental story Saxe predicted. The harder test: does the same machinery work on a real language model trained on real text?</p>
+						<ul>
+							<li class="fragment">Test bed: <strong>Pythia-14M</strong> <cite data-key="biderman2023pythia"></cite>, trained on <strong>The Pile</strong> (~300B tokens). Use the publicly released checkpoints — log-spaced from step 1 out to ~55k.</li>
+							<li class="fragment">Estimation: SGLD with 4 chains × 200 steps from each checkpoint. Use the <strong>normalized BIF</strong> (Pearson correlation) for stability across checkpoints with very different loss scales.</li>
+							<li class="fragment">The prediction to test: <strong>induction-circuit formation</strong>. Tigges et al. 2024 placed it around step 30k via mechanistic interpretability — does BIF independently see the same thing?</li>
+						</ul>
+					</div>
+				</section>
+
+				<!-- Pipeline visual + token classification scheme -->
+				<section>
+					<h2>From Tokens to Pairwise Influence</h2>
+					<div style="display: flex; flex-direction: row; gap: 20px; flex: 1; width: 100%; min-height: 0;">
+						<div style="flex: 0 0 46%; display: flex; align-items: center; justify-content: center; min-width: 0;">
+							<img src="assets/bif_lm_pipeline.svg" alt="BIF estimation pipeline: SGLD samples → per-token loss table → classify tokens by structural role → average within / across classes" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+						</div>
+						<div style="flex: 1; display: flex; align-items: center; justify-content: center; min-width: 0;">
+							<img src="assets/classification.png" alt="Token classification scheme: induction patterns, left/right delimiters, formatting, word parts, word ends" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+						</div>
+					</div>
+				</section>
+
+				<!-- Result: lm_bif.png solo, full image -->
+				<section style="padding: 10px 20px 10px;">
+					<h2 style="font-size: 1em; margin-bottom: 6px;">Per-Class BIF Across Pythia-14M Training</h2>
+					<div style="flex: 1; display: flex; align-items: center; justify-content: center; width: 100%; min-height: 0;">
+						<img src="assets/lm_bif.png" alt="Per-class BIF over Pythia-14M training. Induction-pattern dynamics inflect ~128 steps, strengthen through ~30k, then peak and decline — exactly the window in which Tigges et al. identified the induction circuit forming." style="max-width: 100%; max-height: 100%; object-fit: contain;">
+					</div>
+				</section>
+
+				<!-- Causal intervention experiment with induction_upweighting.png -->
+				<section>
+					<h2>Causal Intervention: <em>When</em> Matters</h2>
+					<div class="math-body" style="font-size: 0.66em;">
+						<p>A 3M-parameter model trained six times with <strong>identical initialization and data ordering</strong> — only the timing of <strong>induction-pattern token upweighting</strong> (4×, in a 500-step window) differs. Same data, different timing.</p>
+						<p class="fragment"><strong>BIF dynamics on the unweighted baseline predict the effect.</strong> Upweighting <em>before</em> the BIF transition (when influence is flat or rising) <strong>delays or disrupts</strong> induction-circuit formation. Upweighting <em>during</em> the BIF descent <strong>accelerates</strong> it — heads form as early as step 5k versus ~7k in the baseline.</p>
+					</div>
+					<div style="flex: 1; display: flex; align-items: center; justify-content: center; width: 100%; min-height: 0;">
+						<img src="assets/induction_upweighting.png" alt="Causal intervention: induction-token upweighting at six different windows. Early windows delay; late windows accelerate. The transition between the two regimes coincides with the BIF descent on the unweighted baseline." style="max-width: 100%; max-height: 100%; object-fit: contain;">
+					</div>
+				</section>
+
+				<!-- LM section wrap-up -->
+				<section>
+					<h2>What the LM Section Showed</h2>
+					<div class="math-body" style="font-size: 0.74em;">
+						<ul>
+							<li class="fragment"><strong>BIF independently flags the induction window.</strong> The trajectory inflects around step 128 and resolves by ~30k — agreeing with what mechanistic interpretability had already found through circuit analysis (Tigges et al. 2024).</li>
+							<li class="fragment"><strong>The intervention experiment is the strongest result.</strong> BIF dynamics on the baseline <em>predict</em> whether upweighting will accelerate or disrupt circuit formation. Same data, different timing, opposite effect.</li>
+							<li class="fragment"><strong>The framework transfers</strong> from controlled toy model to real transformer — at least for the cleanest case. But the LM section also raises questions worth taking seriously.</li>
+						</ul>
+					</div>
+				</section>
+
+				<!-- Limitations: distilled from the review/conversation critique -->
+				<section>
+					<h2>Limitations: How Much Should We Trust the LM Results?</h2>
+					<div class="math-body" style="font-size: 0.66em;">
+						<ul>
+							<li class="fragment"><strong>Wrong scale.</strong> 14M parameters on ~300B tokens is a jammed regime — the $nL$ term dominates the free energy, leaving no complexity budget for sharp phase transitions. Many features may stay in permanent superposition: <em>relief without consolidation.</em></li>
+							<li class="fragment"><strong>Gradual, not sharp.</strong> The toy-model BIFs sign-flip and peak unambiguously. The LM BIFs are smooth trends with at-best ambiguous inflections. Real gradual development, or a capacity artifact? One run can't tell us.</li>
+							<li class="fragment"><strong>Construct validity of "induction tokens."</strong> The class is operationalized as <em>any bigram that has already occurred in the context window</em>. In natural English, that means it's dominated by mundane function-word repetitions ("of the," "in the," "to the") that the model can already predict from base rates — not the linguistically interesting in-context copying we'd want it to track. The aggregate signal survives because an induction circuit helps with all of these, but the classification doesn't carry the linguistic theory we'd want for finer claims.</li>
+							<li class="fragment"><strong>Needs Chen-style scaling analysis.</strong> Vary model size <em>and</em> data size to actually test the theory's scale-generality. The current results validate a single point on that diagram.</li>
+						</ul>
+					</div>
+				</section>
+
+				<!-- ════════════════════════════════════════
+				     Connection back / forward (~5 min)
+				     ════════════════════════════════════════ -->
+
+				<!-- Future directions: BabyLM methodology paper -->
+				<section>
+					<h2>Future Directions: A Linguistic Methodology Paper</h2>
+					<div class="math-body" style="font-size: 0.64em;">
+						<p>The natural application: take this framework to a real question about syntactic acquisition. <strong>BabyLM</strong> (~100M words, English-only) is small enough that dense checkpointing <em>and</em> leave-one-out training are computationally feasible — and it already has the infrastructure we'd need:</p>
+						<ul>
+							<li><strong>BLiMP</strong> <cite data-key="warstadt2020blimp"></cite> gives 67 syntactic minimal-pair subtasks for free as evaluation observables — loss on grammatical vs. ungrammatical members of each pair is a clean signal</li>
+							<li>The CHILDES portion of BabyLM <cite data-key="warstadt2023babylm"></cite> already has rich morphosyntactic annotation, so the "annotated training corpus" side is partially built</li>
+							<li>The BabyLM community is already asking <em>which data sources contribute to syntactic knowledge</em> and <em>does order of exposure matter</em> — both of which this framework can answer</li>
+						</ul>
+						<p>Connection to my own work: I do <strong>controlled rearing</strong> studies — leave-one-out at the corpus level — to investigate the learning contribution of specific linguistic evidence. BIF would give the <em>forward-exploratory</em> tool to identify where to look <em>before</em> committing to expensive retraining runs. The two methods are complementary.</p>
+					</div>
+				</section>
+
+				<!-- Future directions: the three-layer pipeline -->
+				<section>
+					<h2>A Three-Layer Pipeline (One Per Paper)</h2>
+					<div class="math-body" style="font-size: 0.66em;">
+						<ul>
+							<li class="fragment"><strong>Layer 1 — LLC dynamics</strong> (Chen, Hoogland). Find the developmental map: where the transitions are, how many, when. Pure model-side, no linguistic interpretation yet — but it gives the timestamps to anchor everything else.</li>
+							<li class="fragment"><strong>Layer 2 — BIF on syntactic tasks</strong> (Lee). Take BLiMP minimal pairs as the evaluation observable. At each LLC-identified stage, compute BIF between annotated training-data features (POS tags, dependency relations, morphology, ...) and each syntactic construct. Tells us which data drives which acquisition.</li>
+							<li class="fragment"><strong>Layer 3 — Targeted controlled rearing</strong> (Lee, Appendix D.4). Take the strongest BIF findings and test causally: remove the implicated training tokens during the specific window where BIF says they matter, and check whether the acquisition of that construct is delayed or disrupted. Same logic as the induction-upweighting experiment, applied to a linguistic question.</li>
+						</ul>
+						<p class="fragment" style="margin-top: 0.4em;">The contribution isn't a new linguistic finding — it's a <strong>toolkit</strong>. Other researchers can apply the same pipeline to their own constructions of interest.</p>
+					</div>
+				</section>
+
+				<!-- Final conclusions: the path of inference across Chen → Hoogland → Lee -->
+				<section>
+					<h2>The Path We've Traced</h2>
+					<div class="math-body" style="font-size: 0.7em;">
+						<p>We started with a problem: classical learning theory can't explain why neural networks learn in jumps. We finished with a methodology that can — and the beginnings of one that can intervene on it.</p>
+						<ul>
+							<li class="fragment"><strong>Chen et al.</strong> showed that singular models — like neural networks — learn through discrete phase transitions, governed by a free-energy tradeoff between fit and complexity. The toy model is a clean proof of concept.</li>
+							<li class="fragment"><strong>Hoogland et al.</strong> showed the same dynamics appear in real transformers. The LLC is a reliable signal for <em>when</em> a transition happens; behavioral probes tell us <em>what</em>.</li>
+							<li class="fragment"><strong>Lee et al.</strong> closed the loop. The BIF tells us <em>which data</em> drives each transition — and the intervention experiment showed that knowing this lets you <em>causally</em> shape the developmental trajectory.</li>
+						</ul>
+						<p class="fragment">Developmental interpretability has gone from <em>describing</em> stagewise learning to <em>intervening</em> on it. The next question is how to take that machinery to the questions we care about as linguists.</p>
+					</div>
+				</section>
+
+				<!-- References -->
+				<section>
+					<h2>References</h2>
+					<ol class="references-list" id="references"></ol>
+				</section>
+
+			</div>
+		</div>
+
+		<script>
+			MathJax = {
+				tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+				svg: { fontCache: 'global' }
+			};
+		</script>
+		<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/citation-js@0.7/build/citation.min.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+		<script src="dist/reveal.js"></script>
+		<script src="dist/plugin/notes.js"></script>
+		<script src="dist/plugin/markdown.js"></script>
+		<script src="dist/plugin/highlight.js"></script>
+		<script>
+			Reveal.initialize({
+				hash: true,
+				transition: 'none',
+				width: 1280,
+				height: 720,
+				slideNumber: true,
+				controls: false,
+				pdfSeparateFragments: false,
+				plugins: [RevealMarkdown, RevealHighlight, RevealNotes],
+			});
+
+			/* Chart — using design system palette */
+			const style = getComputedStyle(document.documentElement);
+			const s1 = style.getPropertyValue('--c-series-1').trim();
+			const s2 = style.getPropertyValue('--c-series-2').trim();
+			const s3 = style.getPropertyValue('--c-series-3').trim();
+
+			new Chart(document.getElementById('myChart'), {
+				type: 'line',
+				data: {
+					labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6'],
+					datasets: [
+						{
+							label: 'Control',
+							data: [12, 15, 13, 17, 14, 16],
+							borderColor: s1,
+							backgroundColor: s1 + '18',
+							borderWidth: 2.5,
+							pointRadius: 3,
+							pointBackgroundColor: '#fff',
+							pointBorderWidth: 1.5,
+							tension: 0.3
+						},
+						{
+							label: 'Treatment A',
+							data: [12, 19, 24, 29, 35, 42],
+							borderColor: s2,
+							backgroundColor: s2 + '18',
+							borderWidth: 2.5,
+							pointRadius: 3,
+							pointBackgroundColor: '#fff',
+							pointBorderWidth: 1.5,
+							tension: 0.3
+						},
+						{
+							label: 'Treatment B',
+							data: [12, 16, 21, 23, 28, 31],
+							borderColor: s3,
+							backgroundColor: s3 + '18',
+							borderWidth: 2.5,
+							pointRadius: 3,
+							pointBackgroundColor: '#fff',
+							pointBorderWidth: 1.5,
+							tension: 0.3
+						}
+					]
+				},
+				options: {
+					responsive: true,
+					maintainAspectRatio: false,
+					layout: { padding: { top: 0, bottom: 0 } },
+					interaction: { mode: 'index', intersect: false },
+					plugins: {
+						legend: { display: false },
+						tooltip: {
+							backgroundColor: '#1a1a1a',
+							titleFont: { family: "'Source Sans 3', sans-serif", size: 14, weight: '600' },
+							bodyFont: { family: "'Source Sans 3', sans-serif", size: 13 },
+							cornerRadius: 4,
+							padding: 10
+						}
+					},
+					scales: {
+						x: {
+							grid: { display: false },
+							border: { display: false },
+							ticks: {
+								font: { family: "'Source Sans 3', sans-serif", size: 13 },
+								color: '#7a7a7a',
+								padding: 6
+							}
+						},
+						y: {
+							title: {
+								display: true,
+								text: 'Response',
+								font: { family: "'Source Sans 3', sans-serif", size: 13, weight: '400' },
+								color: '#7a7a7a'
+							},
+							border: { display: false },
+							grid: { color: '#ebebeb', drawTicks: false },
+							ticks: {
+								font: { family: "'Source Sans 3', sans-serif", size: 13 },
+								color: '#7a7a7a',
+								padding: 8
+							}
+						}
+					}
+				}
+			});
+		</script>
+		<script>
+			/* ── Citation engine ── */
+			(async () => {
+				const Cite = window.require('citation-js');
+				const resp = await fetch('developmental-interpretability/developmental-interpretability.bib');
+				const bib = await resp.text();
+				const data = new Cite(bib);
+
+				// Collect cited keys in document order
+				const cites = document.querySelectorAll('cite[data-key]');
+				const orderedKeys = [];
+				cites.forEach(el => {
+					const key = el.dataset.key;
+					if (!orderedKeys.includes(key)) orderedKeys.push(key);
+				});
+
+				// Number each citation
+				cites.forEach(el => {
+					const idx = orderedKeys.indexOf(el.dataset.key) + 1;
+					el.textContent = idx;
+				});
+
+				// Build reference list with auto-pagination across slides
+				const REFS_PER_SLIDE = 8;
+				const firstRefList = document.getElementById('references');
+				const firstRefSection = firstRefList.closest('section');
+				const slidesContainer = firstRefSection.parentNode;
+
+				let currentList = firstRefList;
+				let currentCount = 0;
+				let pageNumber = 1;
+				let lastInsertedSection = firstRefSection;
+
+				orderedKeys.forEach((key, i) => {
+					const entry = data.data.find(d => d.id === key);
+					if (!entry) return;
+					const formatted = new Cite(entry).format('bibliography', {
+						format: 'text',
+						template: 'apa',
+						lang: 'en-US'
+					});
+
+					if (currentCount >= REFS_PER_SLIDE) {
+						pageNumber += 1;
+						const newSection = document.createElement('section');
+						newSection.innerHTML = '<h2>References (cont.)</h2><ol class="references-list"></ol>';
+						slidesContainer.insertBefore(newSection, lastInsertedSection.nextSibling);
+						lastInsertedSection = newSection;
+						currentList = newSection.querySelector('ol.references-list');
+						currentCount = 0;
+					}
+
+					const li = document.createElement('li');
+					li.innerHTML = `<span class="ref-number">${i + 1}.</span><span>${formatted.trim()}</span>`;
+					currentList.appendChild(li);
+					currentCount += 1;
+				});
+
+				if (window.Reveal && Reveal.sync) Reveal.sync();
+			})();
+		</script>
+		<script>
+			/* ── Slide Visualizations ── */
+			function hiDPI(canvas) {
+				const dpr = window.devicePixelRatio || 1;
+				if (canvas.dataset.scaled) return;
+				const w = canvas.width, h = canvas.height;
+				canvas.width = w * dpr;
+				canvas.height = h * dpr;
+				canvas.style.width = w + 'px';
+				canvas.style.height = h + 'px';
+				const ctx = canvas.getContext('2d');
+				ctx.scale(dpr, dpr);
+				canvas.dataset.scaled = '1';
+				// Store logical size
+				canvas._logW = w;
+				canvas._logH = h;
+			}
+
+			function whenReady(id, fn) {
+				const el = document.getElementById(id);
+				if (!el) return;
+				const wrapped = (c) => { hiDPI(c); fn(c); };
+				Reveal.on('slidechanged', () => { if (el.offsetParent) wrapped(el); });
+				setTimeout(() => { if (el.offsetParent) wrapped(el); }, 500);
+			}
+
+			/* 1. Gaussian Likelihood bell curve */
+			whenReady('vizLikelihood', (canvas) => {
+				const ctx = canvas.getContext('2d');
+				const W = canvas._logW, H = canvas._logH;
+				ctx.clearRect(0, 0, W, H);
+
+				// Axes
+				ctx.strokeStyle = '#e0e0e0'; ctx.lineWidth = 1;
+				ctx.beginPath(); ctx.moveTo(40, H - 40); ctx.lineTo(W - 10, H - 40); ctx.stroke();
+				ctx.beginPath(); ctx.moveTo(40, H - 40); ctx.lineTo(40, 10); ctx.stroke();
+
+				// Gaussian
+				const mu = W * 0.55, sigma = 50;
+				const gauss = (x) => Math.exp(-0.5 * ((x - mu) / sigma) ** 2);
+
+				// Filled area
+				ctx.beginPath();
+				ctx.moveTo(40, H - 40);
+				for (let x = 40; x <= W - 10; x++) {
+					const y = (H - 50) - gauss(x) * (H - 90);
+					ctx.lineTo(x, y);
+				}
+				ctx.lineTo(W - 10, H - 40);
+				ctx.closePath();
+				ctx.fillStyle = 'rgba(45, 90, 123, 0.08)';
+				ctx.fill();
+
+				// Curve
+				ctx.beginPath();
+				for (let x = 40; x <= W - 10; x++) {
+					const y = (H - 50) - gauss(x) * (H - 90);
+					if (x === 40) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+				}
+				ctx.strokeStyle = '#2d5a7b'; ctx.lineWidth = 2.5;
+				ctx.stroke();
+
+				// f(x,w) marker
+				ctx.setLineDash([4, 4]);
+				ctx.strokeStyle = '#c45a3c'; ctx.lineWidth = 1.5;
+				ctx.beginPath(); ctx.moveTo(mu, H - 40); ctx.lineTo(mu, 20); ctx.stroke();
+				ctx.setLineDash([]);
+
+				// Data point
+				const dx = mu - 60;
+				ctx.fillStyle = '#c45a3c';
+				ctx.beginPath(); ctx.arc(dx, H - 40, 5, 0, Math.PI * 2); ctx.fill();
+
+				// Distance arrow
+				ctx.strokeStyle = '#c45a3c'; ctx.lineWidth = 1;
+				ctx.beginPath(); ctx.moveTo(dx, H - 30); ctx.lineTo(mu, H - 30); ctx.stroke();
+				ctx.beginPath(); ctx.moveTo(mu - 6, H - 34); ctx.lineTo(mu, H - 30); ctx.lineTo(mu - 6, H - 26); ctx.stroke();
+
+				// Labels
+				ctx.font = '13px Source Sans 3, sans-serif';
+				ctx.fillStyle = '#c45a3c';
+				ctx.fillText('x', dx - 4, H - 12);
+				ctx.fillText('f(x,w)', mu - 18, 15);
+				ctx.fillStyle = '#c45a3c';
+				ctx.fillText('||x − f(x,w)||²', (dx + mu) / 2 - 40, H - 8);
+				ctx.fillStyle = '#2d5a7b';
+				ctx.fillText('p(x|w)', W - 65, 50);
+
+				// Axis labels
+				ctx.fillStyle = '#7a7a7a'; ctx.font = '12px Source Sans 3, sans-serif';
+				ctx.fillText('x', W - 15, H - 25);
+				ctx.save(); ctx.translate(15, H / 2); ctx.rotate(-Math.PI / 2);
+				ctx.fillText('probability', -30, 0); ctx.restore();
+			});
+
+			/* 2. Loss Landscape */
+			whenReady('vizLossLandscape', (canvas) => {
+				const ctx = canvas.getContext('2d');
+				const W = canvas._logW, H = canvas._logH;
+				ctx.clearRect(0, 0, W, H);
+
+				// Draw a 2D loss landscape contour-style
+				const cx = W * 0.45, cy = H * 0.45;
+
+				// Contour ellipses
+				const contours = [140, 110, 80, 55, 35, 18];
+				contours.forEach((r, i) => {
+					ctx.beginPath();
+					ctx.ellipse(cx, cy, r * 1.3, r, -0.3, 0, Math.PI * 2);
+					const alpha = 0.06 + i * 0.03;
+					ctx.strokeStyle = `rgba(45, 90, 123, ${0.2 + i * 0.12})`;
+					ctx.lineWidth = 1;
+					ctx.stroke();
+				});
+
+				// Fill minimum
+				ctx.beginPath();
+				ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+				ctx.fillStyle = '#2d5a7b';
+				ctx.fill();
+
+				// Saddle point
+				const sx = cx + 75, sy = cy - 50;
+				ctx.beginPath();
+				ctx.arc(sx, sy, 3, 0, Math.PI * 2);
+				ctx.fillStyle = '#c45a3c';
+				ctx.fill();
+
+				// SGD trajectory
+				const traj = [
+					[W * 0.85, H * 0.82],
+					[W * 0.75, H * 0.7],
+					[W * 0.65, H * 0.58],
+					[sx + 5, sy + 8],
+					[cx + 40, cy + 15],
+					[cx + 15, cy + 5],
+					[cx + 2, cy + 1]
+				];
+				ctx.beginPath();
+				ctx.moveTo(traj[0][0], traj[0][1]);
+				for (let k = 1; k < traj.length; k++) {
+					ctx.lineTo(traj[k][0], traj[k][1]);
+				}
+				ctx.strokeStyle = '#c45a3c'; ctx.lineWidth = 1.5;
+				ctx.setLineDash([3, 3]); ctx.stroke(); ctx.setLineDash([]);
+
+				// Start dot
+				ctx.beginPath(); ctx.arc(traj[0][0], traj[0][1], 4, 0, Math.PI * 2);
+				ctx.fillStyle = '#c45a3c'; ctx.fill();
+
+				// Labels
+				ctx.font = '12px Source Sans 3, sans-serif';
+				ctx.fillStyle = '#2d5a7b';
+				ctx.fillText('minimum', cx + 8, cy + 18);
+				ctx.fillStyle = '#c45a3c';
+				ctx.fillText('saddle', sx + 8, sy - 5);
+				ctx.fillText('SGD path', traj[0][0] - 50, traj[0][1] + 15);
+
+				// Axis labels
+				ctx.fillStyle = '#7a7a7a'; ctx.font = '13px Source Sans 3, sans-serif';
+				ctx.fillText('w₁', W - 20, H - 10);
+				ctx.fillText('w₂', 8, 15);
+				ctx.fillStyle = '#3a3a3a'; ctx.font = '14px Source Sans 3, sans-serif';
+				ctx.fillText('L(w) contours', 10, H - 10);
+			});
+
+			/* 3. Partition Sets in (W_i·W_j, b_i) plane */
+			whenReady('vizPartition', (canvas) => {
+				const ctx = canvas.getContext('2d');
+				const W = canvas._logW, H = canvas._logH;
+				ctx.clearRect(0, 0, W, H);
+
+				const ox = 220, oy = 190; // origin
+				const sx = 1.8, sy = 1.8; // scale
+
+				// Axes
+				ctx.strokeStyle = '#ccc'; ctx.lineWidth = 1;
+				ctx.beginPath(); ctx.moveTo(30, oy); ctx.lineTo(W - 10, oy); ctx.stroke();
+				ctx.beginPath(); ctx.moveTo(ox, 10); ctx.lineTo(ox, H - 30); ctx.stroke();
+
+				// P_{i,j} region: W_i·W_j > 0 AND -W_i·W_j ≤ b_i ≤ 0
+				// In the right half (W_i·W_j > 0), between -diagonal and b=0
+				ctx.beginPath();
+				ctx.moveTo(ox, oy); // origin
+				ctx.lineTo(ox + 100 * sx, oy); // along b=0 axis
+				ctx.lineTo(ox + 100 * sx, oy + 100 * sy); // down to -W_i·W_j line
+				ctx.closePath();
+				ctx.fillStyle = 'rgba(196, 90, 60, 0.15)';
+				ctx.fill();
+				ctx.strokeStyle = '#c45a3c'; ctx.lineWidth = 1.5; ctx.stroke();
+
+				// P_i region (subset, narrower band near diagonal)
+				ctx.beginPath();
+				ctx.moveTo(ox, oy);
+				ctx.lineTo(ox + 60 * sx, oy);
+				ctx.lineTo(ox + 60 * sx, oy + 60 * sy);
+				ctx.closePath();
+				ctx.fillStyle = 'rgba(45, 90, 123, 0.15)';
+				ctx.fill();
+				ctx.strokeStyle = '#2d5a7b'; ctx.lineWidth = 1.5; ctx.stroke();
+
+				// Q_{i,j} region: b_i > 0 AND -W_i·W_j > b_i
+				// Left of origin (W_i·W_j < 0), above b=0, below diagonal
+				ctx.beginPath();
+				ctx.moveTo(ox, oy); // origin
+				ctx.lineTo(ox - 90 * sx, oy); // left along b=0
+				ctx.lineTo(ox - 90 * sx, oy - 90 * sy); // up to diagonal
+				ctx.closePath();
+				ctx.fillStyle = 'rgba(90, 138, 94, 0.15)';
+				ctx.fill();
+				ctx.strokeStyle = '#5a8a5e'; ctx.lineWidth = 1.5; ctx.stroke();
+
+				// Diagonal line b = -W_i·W_j
+				ctx.setLineDash([5, 3]);
+				ctx.strokeStyle = '#7a7a7a'; ctx.lineWidth = 1;
+				ctx.beginPath();
+				ctx.moveTo(ox - 100 * sx, oy - 100 * sy);
+				ctx.lineTo(ox + 100 * sx, oy + 100 * sy);
+				ctx.stroke();
+				ctx.setLineDash([]);
+
+				// Labels
+				ctx.font = 'bold 13px Source Sans 3, sans-serif';
+				ctx.fillStyle = '#c45a3c';
+				ctx.fillText('P_{i,j}', ox + 80, oy + 50);
+				ctx.fillStyle = '#2d5a7b';
+				ctx.fillText('P_i', ox + 25, oy + 30);
+				ctx.fillStyle = '#5a8a5e';
+				ctx.fillText('Q_{i,j}', ox - 100, oy - 60);
+
+				// Axis labels
+				ctx.font = '13px Source Sans 3, sans-serif';
+				ctx.fillStyle = '#3a3a3a';
+				ctx.fillText('W_i · W_j', W - 70, oy - 8);
+				ctx.fillText('b_i', ox + 8, 20);
+
+				// Quadrant labels
+				ctx.font = '11px Source Sans 3, sans-serif';
+				ctx.fillStyle = '#a8a8a8';
+				ctx.fillText('b_i > 0', ox + 5, 45);
+				ctx.fillText('b_i ≤ 0', ox + 5, H - 40);
+
+				// Diagonal label
+				ctx.save();
+				ctx.translate(ox + 100, oy + 110);
+				ctx.rotate(Math.atan2(1, 1));
+				ctx.fillStyle = '#7a7a7a'; ctx.font = '11px Source Sans 3, sans-serif';
+				ctx.fillText('b_i = −W_i·W_j', 0, -5);
+				ctx.restore();
+			});
+
+			/* 5. H^- visualization: ReLU with negative bias */
+			whenReady('vizHminus', (canvas) => {
+				const ctx = canvas.getContext('2d');
+				const W = canvas._logW, H = canvas._logH;
+				ctx.clearRect(0, 0, W, H);
+
+				const ox = 60, oy = H - 60;
+				const scaleX = 3, scaleY = 2.5;
+
+				// Axes
+				ctx.strokeStyle = '#e0e0e0'; ctx.lineWidth = 1;
+				ctx.beginPath(); ctx.moveTo(ox, 20); ctx.lineTo(ox, oy); ctx.lineTo(W - 10, oy); ctx.stroke();
+
+				// ReLU with negative bias: max(0, x + b) where b < 0
+				const bias = -30;
+				const kink = -bias; // activation starts at x = -b
+
+				// Dead zone
+				ctx.fillStyle = 'rgba(45, 90, 123, 0.06)';
+				ctx.fillRect(ox, 20, kink * scaleX, oy - 20);
+
+				// Active zone
+				ctx.fillStyle = 'rgba(196, 90, 60, 0.06)';
+				ctx.fillRect(ox + kink * scaleX, 20, W - ox - kink * scaleX - 10, oy - 20);
+
+				// ReLU line
+				ctx.beginPath();
+				ctx.moveTo(ox, oy);
+				ctx.lineTo(ox + kink * scaleX, oy); // flat part
+				ctx.lineTo(W - 10, oy - (W - 10 - ox - kink * scaleX) * 0.7); // active part
+				ctx.strokeStyle = '#2d5a7b'; ctx.lineWidth = 2.5;
+				ctx.stroke();
+
+				// Kink point
+				ctx.beginPath();
+				ctx.arc(ox + kink * scaleX, oy, 5, 0, Math.PI * 2);
+				ctx.fillStyle = '#c45a3c'; ctx.fill();
+
+				// Bias marker
+				ctx.setLineDash([4, 3]);
+				ctx.strokeStyle = '#c45a3c'; ctx.lineWidth = 1;
+				ctx.beginPath();
+				ctx.moveTo(ox + kink * scaleX, oy);
+				ctx.lineTo(ox + kink * scaleX, 20);
+				ctx.stroke();
+				ctx.setLineDash([]);
+
+				// Labels
+				ctx.font = '13px Source Sans 3, sans-serif';
+				ctx.fillStyle = '#2d5a7b';
+				ctx.fillText('suppressed', ox + 10, oy / 2);
+				ctx.fillText('(b_i ≤ 0)', ox + 10, oy / 2 + 18);
+				ctx.fillStyle = '#c45a3c';
+				ctx.fillText('active region', ox + kink * scaleX + 20, oy / 2);
+				ctx.fillText('x = −b_i', ox + kink * scaleX + 5, oy + 18);
+
+				ctx.fillStyle = '#3a3a3a'; ctx.font = '14px Source Sans 3, sans-serif';
+				ctx.fillText('max(0, Wᵢx + bᵢ)', W / 2 - 50, 30);
+
+				ctx.fillStyle = '#7a7a7a'; ctx.font = '12px Source Sans 3, sans-serif';
+				ctx.fillText('input x', W - 55, oy + 18);
+				ctx.fillText('output', ox - 50, 15);
+
+				// Annotation: P_{i,j} controls which interaction terms are active
+				ctx.font = '11px Source Sans 3, sans-serif';
+				ctx.fillStyle = '#7a7a7a';
+				ctx.fillText('δ(P_{i,j}) selects active interactions', ox + kink * scaleX + 15, oy / 2 + 30);
+			});
+
+			/* 6. H^+ visualization: ReLU with positive bias */
+			whenReady('vizHplus', (canvas) => {
+				const ctx = canvas.getContext('2d');
+				const W = canvas._logW, H = canvas._logH;
+				ctx.clearRect(0, 0, W, H);
+
+				const ox = 100, oy = H - 60;
+				const scaleX = 3;
+
+				// Axes
+				ctx.strokeStyle = '#e0e0e0'; ctx.lineWidth = 1;
+				ctx.beginPath(); ctx.moveTo(ox, 20); ctx.lineTo(ox, oy); ctx.lineTo(W - 10, oy); ctx.stroke();
+
+				const bias = 25;
+
+				// Full active zone (left of origin, already active due to positive bias)
+				ctx.fillStyle = 'rgba(196, 90, 60, 0.06)';
+				ctx.fillRect(ox, 20, W - ox - 10, oy - 20);
+
+				// ReLU with positive bias: already has offset at x=0
+				ctx.beginPath();
+				// The line comes from left, hitting zero at x = -b (which is negative, off-screen left)
+				// At x=0 (our origin), output = b
+				ctx.moveTo(ox - 30, oy); // off to the left (suppressed region barely visible)
+				const kinkX = ox - bias * scaleX; // kink is to the left
+				if (kinkX > ox - 30) {
+					ctx.lineTo(kinkX, oy);
+				}
+				ctx.lineTo(ox, oy - bias * scaleX * 0.7);
+				ctx.lineTo(W - 10, oy - (bias + (W - 10 - ox) / scaleX) * scaleX * 0.7);
+				ctx.strokeStyle = '#c45a3c'; ctx.lineWidth = 2.5;
+				ctx.stroke();
+
+				// Bias offset at origin
+				ctx.setLineDash([4, 3]);
+				ctx.strokeStyle = '#2d5a7b'; ctx.lineWidth = 1;
+				ctx.beginPath();
+				ctx.moveTo(ox, oy);
+				ctx.lineTo(ox, oy - bias * scaleX * 0.7);
+				ctx.stroke();
+				ctx.setLineDash([]);
+
+				// Bias marker
+				ctx.beginPath();
+				ctx.arc(ox, oy - bias * scaleX * 0.7, 5, 0, Math.PI * 2);
+				ctx.fillStyle = '#2d5a7b'; ctx.fill();
+
+				// Labels
+				ctx.font = '13px Source Sans 3, sans-serif';
+				ctx.fillStyle = '#2d5a7b';
+				ctx.fillText('b_i > 0', ox + 8, oy - bias * scaleX * 0.35);
+				ctx.fillText('(pre-activated)', ox + 8, oy - bias * scaleX * 0.35 + 16);
+
+				ctx.fillStyle = '#c45a3c';
+				ctx.fillText('wider active range', ox + 80, 50);
+
+				ctx.fillStyle = '#3a3a3a'; ctx.font = '14px Source Sans 3, sans-serif';
+				ctx.fillText('max(0, Wᵢx + bᵢ)', W / 2 - 50, 30);
+
+				ctx.fillStyle = '#7a7a7a'; ctx.font = '12px Source Sans 3, sans-serif';
+				ctx.fillText('input x', W - 55, oy + 18);
+				ctx.fillText('output', ox - 90, 15);
+
+				// Annotation
+				ctx.font = '11px Source Sans 3, sans-serif';
+				ctx.fillStyle = '#7a7a7a';
+				ctx.fillText('More terms active → richer Q_{i,j} structure', ox + 60, 75);
+
+				// Draw the boundary region indicator
+				ctx.strokeStyle = '#8b6eae'; ctx.lineWidth = 1.5;
+				ctx.beginPath();
+				ctx.moveTo(ox - 10, oy);
+				ctx.lineTo(ox - 10, oy - bias * scaleX * 0.7);
+				ctx.stroke();
+				ctx.beginPath();
+				ctx.moveTo(ox - 15, oy); ctx.lineTo(ox - 5, oy); ctx.stroke();
+				ctx.beginPath();
+				ctx.moveTo(ox - 15, oy - bias * scaleX * 0.7); ctx.lineTo(ox - 5, oy - bias * scaleX * 0.7); ctx.stroke();
+				ctx.fillStyle = '#8b6eae'; ctx.font = '11px Source Sans 3, sans-serif';
+				ctx.fillText('Q boundary', ox - 90, oy - bias * scaleX * 0.35);
+			});
+
+			// Citation modal — Cmd/Ctrl+R to show references on current slide
+			(function() {
+				const modal = document.createElement('div');
+				modal.id = 'cite-modal';
+				modal.style.cssText = 'display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center';
+				const box = document.createElement('div');
+				box.style.cssText = "background:#fff;border-radius:8px;padding:24px 32px;max-width:800px;max-height:80vh;overflow-y:auto;font-family:'Source Sans 3',sans-serif;color:#3a3a3a;box-shadow:0 8px 32px rgba(0,0,0,0.2)";
+				modal.appendChild(box);
+				document.body.appendChild(modal);
+
+				modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+
+				document.addEventListener('keydown', (e) => {
+					if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
+						e.preventDefault();
+						const slide = Reveal.getCurrentSlide();
+						const cites = slide.querySelectorAll('cite[data-key]');
+						if (cites.length === 0) {
+							box.innerHTML = '<p style="color:#7a7a7a;font-size:14px;">No citations on this slide.</p>';
+						} else {
+							const keys = [];
+							cites.forEach(c => { if (!keys.includes(c.dataset.key)) keys.push(c.dataset.key); });
+							const refItems = document.querySelectorAll('#references li');
+							let html = '<h3 style="margin:0 0 12px;font-size:16px;color:#1a1a1a;border-bottom:2px solid #1a1a1a;padding-bottom:6px">References on this slide</h3>';
+							keys.forEach(key => {
+								const cite = document.querySelector('cite[data-key="' + key + '"]');
+								const citeNum = cite ? cite.textContent : '?';
+								const idx = parseInt(citeNum) - 1;
+								const refLi = idx >= 0 && idx < refItems.length ? refItems[idx] : null;
+								const refText = refLi ? (refLi.querySelector('span:last-child')?.textContent || key) : key;
+								html += '<p style="font-size:14px;line-height:1.6;margin:8px 0;padding:6px 0;border-bottom:1px solid #e0e0e0"><span style="color:#2d5a7b;font-weight:600">[' + citeNum + ']</span> ' + refText + '</p>';
+							});
+							box.innerHTML = html;
+						}
+						modal.style.display = 'flex';
+					}
+					if (e.key === 'Escape' && modal.style.display === 'flex') {
+						modal.style.display = 'none';
+					}
+				});
+			})();
+
+			// ── Slide Search (Cmd+P) ──
+			(function(){
+				// Build slide index
+				function getSlideIndex(){
+					const slides = document.querySelectorAll('.reveal .slides > section');
+					return Array.from(slides).map((sec, i) => {
+						const h = sec.querySelector('h1, h2');
+						const title = h ? h.textContent.trim() : '';
+						const text = sec.textContent.trim().replace(/\s+/g, ' ').slice(0, 300);
+						const isIframe = !!sec.querySelector('iframe');
+						const isTitleCard = sec.classList.contains('slide-title-card');
+						return { i, title, text, isIframe, isTitleCard, el: sec };
+					});
+				}
+
+				// Create modal
+				const overlay = document.createElement('div');
+				overlay.id = 'search-overlay';
+				overlay.style.cssText = 'display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:99999;justify-content:center;align-items:flex-start;padding-top:10vh';
+
+				const modal = document.createElement('div');
+				modal.style.cssText = "background:#fff;border-radius:10px;width:600px;max-height:70vh;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,0.25);font-family:'Source Sans 3',sans-serif;overflow:hidden";
+
+				const inputWrap = document.createElement('div');
+				inputWrap.style.cssText = 'padding:14px 16px 10px;border-bottom:1px solid #e0e0e0;display:flex;align-items:center;gap:8px';
+
+				const icon = document.createElement('span');
+				icon.textContent = '\u2315';
+				icon.style.cssText = 'font-size:18px;color:#a8a8a8';
+
+				const input = document.createElement('input');
+				input.type = 'text';
+				input.placeholder = 'Search slides...';
+				input.style.cssText = "flex:1;border:none;outline:none;font-size:16px;font-family:'Source Sans 3',sans-serif;color:#1a1a1a;background:transparent";
+
+				inputWrap.appendChild(icon);
+				inputWrap.appendChild(input);
+
+				const results = document.createElement('div');
+				results.style.cssText = 'flex:1;overflow-y:auto;padding:6px 0';
+
+				modal.appendChild(inputWrap);
+				modal.appendChild(results);
+				overlay.appendChild(modal);
+				document.body.appendChild(overlay);
+
+				let selectedIdx = 0;
+				let currentResults = [];
+
+				function renderResults(query){
+					const index = getSlideIndex();
+					const q = query.toLowerCase().trim();
+
+					if(!q){
+						currentResults = index;
+					} else {
+						currentResults = index.filter(s =>
+							s.title.toLowerCase().includes(q) || s.text.toLowerCase().includes(q)
+						);
+						// Sort: title matches first
+						currentResults.sort((a,b) => {
+							const aTitle = a.title.toLowerCase().includes(q) ? 0 : 1;
+							const bTitle = b.title.toLowerCase().includes(q) ? 0 : 1;
+							return aTitle - bTitle || a.i - b.i;
+						});
+					}
+
+					selectedIdx = 0;
+					results.innerHTML = currentResults.map((s, ri) => {
+						const num = s.i + 1;
+						const badge = s.isIframe ? '<span style="background:#2d5a7b;color:#fff;font-size:9px;padding:1px 5px;border-radius:3px;margin-left:6px">interactive</span>' :
+							s.isTitleCard ? '<span style="background:#c4933f;color:#fff;font-size:9px;padding:1px 5px;border-radius:3px;margin-left:6px">section</span>' : '';
+
+						// Snippet with highlight
+						let snippet = s.text.slice(0, 150);
+						if(q && snippet.toLowerCase().includes(q)){
+							const idx = snippet.toLowerCase().indexOf(q);
+							snippet = snippet.slice(0, idx) + '<mark style="background:rgba(45,90,123,0.15);padding:0 1px;border-radius:2px">' + snippet.slice(idx, idx + q.length) + '</mark>' + snippet.slice(idx + q.length);
+						}
+
+						return '<div class="search-result" data-ri="'+ri+'" style="padding:8px 16px;cursor:pointer;border-bottom:1px solid #f0f0f0;'+(ri===selectedIdx?'background:#f6f6f4;':'')+'" onmouseenter="this.style.background=\'#f6f6f4\'" onmouseleave="this.style.background=\''+( ri===selectedIdx?'#f6f6f4':'')+'\'">'+
+							'<div style="display:flex;align-items:baseline;gap:8px">'+
+								'<span style="color:#a8a8a8;font-size:13px;font-weight:500;min-width:24px">'+num+'</span>'+
+								'<span style="font-size:15px;font-weight:600;color:#1a1a1a">'+s.title+'</span>'+
+								badge+
+							'</div>'+
+							'<div style="font-size:12px;color:#7a7a7a;margin:3px 0 0 32px;line-height:1.4">'+snippet+'</div>'+
+						'</div>';
+					}).join('');
+				}
+
+				function navigate(s){
+					Reveal.slide(s.i);
+					close();
+				}
+
+				function updateSelection(){
+					results.querySelectorAll('.search-result').forEach((el, i) => {
+						el.style.background = i === selectedIdx ? '#f6f6f4' : '';
+					});
+					// Scroll into view
+					const sel = results.querySelector('.search-result:nth-child('+(selectedIdx+1)+')');
+					if(sel) sel.scrollIntoView({block:'nearest'});
+				}
+
+				function open(){
+					overlay.style.display = 'flex';
+					input.value = '';
+					renderResults('');
+					setTimeout(() => input.focus(), 50);
+				}
+
+				function close(){
+					overlay.style.display = 'none';
+					input.blur();
+				}
+
+				overlay.addEventListener('click', e => { if(e.target === overlay) close(); });
+
+				input.addEventListener('input', () => renderResults(input.value));
+
+				input.addEventListener('keydown', e => {
+					if(e.key === 'ArrowDown'){ e.preventDefault(); selectedIdx = Math.min(selectedIdx+1, currentResults.length-1); updateSelection(); }
+					else if(e.key === 'ArrowUp'){ e.preventDefault(); selectedIdx = Math.max(selectedIdx-1, 0); updateSelection(); }
+					else if(e.key === 'Enter'){ e.preventDefault(); if(currentResults[selectedIdx]) navigate(currentResults[selectedIdx]); }
+					else if(e.key === 'Escape'){ e.preventDefault(); close(); }
+				});
+
+				results.addEventListener('click', e => {
+					const el = e.target.closest('.search-result');
+					if(el){
+						const ri = parseInt(el.dataset.ri);
+						if(currentResults[ri]) navigate(currentResults[ri]);
+					}
+				});
+
+				document.addEventListener('keydown', e => {
+					if((e.metaKey || e.ctrlKey) && e.key === 'k'){
+						e.preventDefault();
+						if(overlay.style.display === 'flex') close(); else open();
+					}
+					if(e.key === 'Escape' && overlay.style.display === 'flex') close();
+				});
+			})();
+
+			// Trigger initial draw
+			setTimeout(() => Reveal.dispatchEvent({ type: 'slidechanged' }), 800);
+		</script>
+	</body>
+</html>

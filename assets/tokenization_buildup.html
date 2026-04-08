@@ -1,0 +1,169 @@
+
+<style>
+.top-ctrl{display:flex;gap:8px;align-items:center;margin:0 0 10px;flex-wrap:wrap}
+.top-ctrl button{font-size:12px;padding:5px 14px}
+.step-nav{display:flex;gap:4px;align-items:center}
+.step-nav button{font-size:13px;padding:4px 12px}
+.step-label{font-size:13px;font-weight:500;color:var(--color-text-primary);min-width:140px;text-align:center}
+.grid-wrap{overflow-x:auto;margin:0 0 8px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:10px 12px}
+.grid-label{font-size:11px;color:var(--color-text-secondary);margin:0 0 6px}
+.grid{display:flex;gap:0;align-items:stretch}
+.grid-col{display:flex;flex-direction:column;gap:0;min-width:54px}
+.grid-col.dim-labels{min-width:42px}
+.grid-col.dim-labels .gc{justify-content:flex-end;padding-right:6px;border:none;background:none;font-size:11px;color:var(--color-text-secondary)}
+.gc{height:24px;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:10px;border:0.5px solid var(--color-border-tertiary);min-width:54px;padding:0 4px}
+.gc:first-child{border-radius:4px 4px 0 0}
+.gc:last-child{border-radius:0 0 4px 4px}
+.gc.hdr{font-weight:500;font-size:10px;height:28px;border:none;background:none;color:var(--color-text-secondary)}
+.gc.x{background:#E6F1FB;color:#0C447C}
+.gc.y{background:#EEEDFE;color:#3C3489}
+.gc.z{background:var(--color-background-secondary);color:var(--color-text-tertiary)}
+.gc.hidden{opacity:0.12}
+.gc.query{background:#FAEEDA;color:#854F0B;font-weight:500}
+.gc.target{background:#FAECE7;color:#712B13;font-weight:500;border:1.5px dashed #D85A30}
+.pred-box{padding:10px 14px;border-radius:var(--border-radius-md);background:var(--color-background-secondary);margin:0 0 8px;font-size:13px;color:var(--color-text-secondary);line-height:1.7}
+.pred-box strong{color:var(--color-text-primary)}
+</style>
+
+<div class="top-ctrl">
+  <button onclick="resample()">New task</button>
+  <div class="step-nav">
+    <button onclick="prev()">← Prev</button>
+    <div class="step-label" id="step-label">Predicting y₁</div>
+    <button onclick="next()">Next →</button>
+  </div>
+</div>
+
+<div class="grid-wrap">
+  <div class="grid-label" id="grid-label">The model's full input at this prediction step — what's visible due to causal mask:</div>
+  <div class="grid" id="grid"></div>
+</div>
+
+<div class="pred-box" id="pred-box"></div>
+
+<script>
+const D=4, K=4; // Use K=4 for visual clarity
+let task,xs,ys;
+let step=0; // 0 to K-1, which x-token position we're predicting at
+
+function randn(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+
+function resample(){
+  task=[];for(let i=0;i<D;i++)task.push(+(randn()*0.8).toFixed(2));
+  xs=[];ys=[];
+  for(let k=0;k<K;k++){
+    const x=[];for(let i=0;i<D;i++)x.push(+(randn()).toFixed(2));
+    xs.push(x);
+    const yt=task.reduce((s,ti,i)=>s+ti*x[i],0);
+    ys.push(+(yt+randn()*0.35).toFixed(2));
+  }
+  step=0;
+  render();
+}
+
+function prev(){if(step>0){step--;render();}}
+function next(){if(step<K-1){step++;render();}}
+
+function render(){
+  document.getElementById('step-label').textContent=`Predicting y${step+1} (step ${step+1} of ${K})`;
+
+  // Build the grid
+  // At x-token position (step), the model sees:
+  // [x1, y1, x2, y2, ..., x_{step}, y_{step}, x_{step+1}]
+  // i.e. tokens 0 through 2*step (inclusive)
+  // The prediction is read from dim 0 of the output at position 2*step
+
+  const visibleUpTo = 2*step; // last visible token index
+
+  let html='';
+
+  // Dim labels column
+  html+='<div class="grid-col dim-labels">';
+  html+='<div class="gc hdr"></div>'; // header spacer
+  html+='<div class="gc">dim 0</div>';
+  html+='<div class="gc">dim 1</div>';
+  html+='<div class="gc">dim 2</div>';
+  html+='<div class="gc">dim 3</div>';
+  html+='<div class="gc">dim 4</div>';
+  html+='<div class="gc hdr" style="font-size:9px">role</div>';
+  html+='</div>';
+
+  // All 2K tokens
+  for(let tok=0; tok<2*K; tok++){
+    const isX = tok%2===0;
+    const k = Math.floor(tok/2); // which example pair
+    const visible = tok<=visibleUpTo;
+    const isCurrentQuery = tok===visibleUpTo && isX;
+    const isTarget = tok===visibleUpTo+1 && !isX; // the y we're predicting
+
+    html+='<div class="grid-col">';
+
+    // Header
+    if(isX){
+      html+=`<div class="gc hdr" style="${isCurrentQuery?'color:#854F0B;font-weight:500':''}">${isCurrentQuery?'→ ':''}x${k+1}</div>`;
+    } else {
+      html+=`<div class="gc hdr" style="${isTarget?'color:#D85A30;font-weight:500':''}">${isTarget?'→ ':''}y${k+1}</div>`;
+    }
+
+    // 5 dims
+    for(let d=0;d<5;d++){
+      let val, cls;
+      if(isX){
+        if(d===0){val='0';cls=visible?'z':'z hidden';}
+        else{val=xs[k][d-1].toFixed(1);cls=visible?(isCurrentQuery?'query':'x'):'x hidden';}
+      } else {
+        if(d===0){val=ys[k].toFixed(2);cls=visible?'y':(isTarget?'target':'y hidden');}
+        else{val='0';cls=visible?'z':'z hidden';}
+      }
+      html+=`<div class="gc ${cls}">${val}</div>`;
+    }
+
+    // Role label
+    let role='';
+    if(isCurrentQuery) role='QUERY';
+    else if(isTarget) role='PREDICT';
+    else if(visible && isX) role='context';
+    else if(visible && !isX) role='context';
+    else role='future';
+
+    let roleStyle='font-size:9px;';
+    if(isCurrentQuery) roleStyle+='color:#854F0B;font-weight:500';
+    else if(isTarget) roleStyle+='color:#D85A30;font-weight:500';
+    else if(!visible) roleStyle+='opacity:0.25';
+    else roleStyle+='color:var(--color-text-tertiary)';
+
+    html+=`<div class="gc hdr" style="${roleStyle}">${role}</div>`;
+    html+='</div>';
+  }
+
+  document.getElementById('grid').innerHTML=html;
+
+  // Prediction explanation
+  const nContext=step; // number of complete (x,y) pairs seen
+  let predText='';
+
+  if(step===0){
+    predText=`<strong>Predicting y₁ with 0 context pairs.</strong><br>
+    The model sees only x₁ (the query, highlighted gold). No previous (x,y) pairs are available — every column to the right is behind the causal mask.<br><br>
+    The model must output ŷ₁ into <strong>dim 0 of its output at this position</strong>. With no information about the task, the best prediction is ŷ₁ = 0 (the task prior).<br><br>
+    True y₁ = ${ys[0]}, so loss = (0 − ${ys[0]})² = ${(ys[0]**2).toFixed(3)}`;
+  } else if(step===1){
+    predText=`<strong>Predicting y₂ with 1 context pair.</strong><br>
+    The model now sees x₁, y₁ (one complete example), plus the current query x₂. Look at the grid — the first two columns are fully visible, showing both the input x₁ and its label y₁.<br><br>
+    The model can now start inferring the task: "when x₁ = [${xs[0].join(', ')}], the output was y₁ = ${ys[0]}." But one example in D=4 dimensions is heavily underdetermined.`;
+  } else if(step===2){
+    predText=`<strong>Predicting y₃ with 2 context pairs.</strong><br>
+    Two complete (x,y) pairs visible: (x₁,y₁) and (x₂,y₂). Two equations, four unknowns — still underdetermined, but the model can constrain the task vector to a 2-dimensional subspace.`;
+  } else {
+    predText=`<strong>Predicting y${step+1} with ${nContext} context pairs.</strong><br>
+    ${nContext} complete (x,y) pairs visible. ${nContext>=D?`With ${nContext} ≥ D = ${D} examples, the system is ${nContext>D?'overdetermined':'exactly determined'} — the model has enough information to identify the task vector t.`:`Still underdetermined (${nContext} < D = ${D}), but getting closer.`}<br><br>
+    ${nContext>=D?`The irreducible loss is now just the noise: σ² = 0.125. A good ICL model should approach this.`:''}`;
+  }
+
+  predText+=`<br><br><span style="font-size:11px;color:var(--color-text-tertiary)">Hidden task: t = [${task.join(', ')}] · The model never sees this — it infers it from the visible (x,y) pairs.</span>`;
+
+  document.getElementById('pred-box').innerHTML=predText;
+}
+
+resample();
+</script>

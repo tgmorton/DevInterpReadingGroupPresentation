@@ -1,0 +1,83 @@
+<style>
+.wrap{padding:0.25rem 0}
+.sec{margin:0 0 10px}
+.sec-h{font-size:15px;font-weight:500;color:var(--color-text-primary);margin:0 0 4px}
+.grid{display:grid;gap:1px;font-family:var(--font-mono);font-size:13px}
+.gh{font-weight:500;padding:2px 3px;color:var(--color-text-secondary);text-align:center;font-size:12px}
+.gc{padding:2px 3px;text-align:center;border-radius:2px}
+.rl{padding:2px 6px;font-weight:500;font-size:13px;text-align:right;color:var(--color-text-secondary)}
+.on{background:#E6F1FB;color:#0C447C}
+.off{background:var(--color-background-secondary);color:var(--color-text-tertiary)}
+.f1{background:#E1F5EE;color:#085041}
+.f0{background:var(--color-background-secondary);color:var(--color-text-tertiary)}
+.sep{border-left:2px solid var(--color-border-secondary)}
+.hier{display:flex;gap:4px;flex-wrap:wrap;margin:4px 0}
+.htag{font-size:12px;padding:2px 8px;border-radius:10px;border:0.5px solid var(--color-border-tertiary)}
+.note{font-size:13px;color:var(--color-text-secondary);margin:6px 0 0;line-height:1.5}
+</style>
+<div class="wrap">
+<div class="sec">
+  <div class="sec-h">Input: one-hot identity (which item?)</div>
+  <div class="grid" style="grid-template-columns:70px repeat(8,1fr)">
+    <div class="gh"></div>
+    <div class="gh">pine</div><div class="gh">oak</div><div class="gh">rose</div><div class="gh">lily</div>
+    <div class="gh">spar.</div><div class="gh">peng.</div><div class="gh">cat</div><div class="gh">dog</div>
+    <div class="rl">pine</div>  <div class="gc on">1</div><div class="gc off">0</div><div class="gc off">0</div><div class="gc off">0</div><div class="gc off">0</div><div class="gc off">0</div><div class="gc off">0</div><div class="gc off">0</div>
+    <div class="rl">oak</div>   <div class="gc off">0</div><div class="gc on">1</div><div class="gc off">0</div><div class="gc off">0</div><div class="gc off">0</div><div class="gc off">0</div><div class="gc off">0</div><div class="gc off">0</div>
+    <div class="rl">dog</div>   <div class="gc off">0</div><div class="gc off">0</div><div class="gc off">0</div><div class="gc off">0</div><div class="gc off">0</div><div class="gc off">0</div><div class="gc off">0</div><div class="gc on">1</div>
+  </div>
+  <div class="note">Just an index — no structure here. All structure lives in the output.</div>
+</div>
+
+<div class="sec">
+  <div class="sec-h">Output: feature vector (what properties does it have?)</div>
+  <div class="grid" style="grid-template-columns:70px repeat(15,1fr)">
+    <div class="gh"></div>
+    <div class="gh" style="font-size:11px">is_living</div>
+    <div class="gh" style="font-size:11px">is_plant</div>
+    <div class="gh" style="font-size:11px">is_tree</div>
+    <div class="gh" style="font-size:11px">is_flower</div>
+    <div class="gh" style="font-size:11px">is_animal</div>
+    <div class="gh" style="font-size:11px">is_bird</div>
+    <div class="gh" style="font-size:11px">is_mamml</div>
+    <div class="gh" style="font-size:11px">can_fly</div>
+    <div class="gh" style="font-size:11px">can_swim</div>
+    <div class="gh" style="font-size:11px">has_legs</div>
+    <div class="gh" style="font-size:11px">has_bark</div>
+    <div class="gh" style="font-size:11px">has_petals</div>
+    <div class="gh" style="font-size:11px">can_purr</div>
+    <div class="gh" style="font-size:11px">can_bark</div>
+    <div class="gh" style="font-size:11px">has_beak</div>
+    <div class="rl" style="color:#085041">pine</div>
+    <div class="gc f1">1</div><div class="gc f1">1</div><div class="gc f1">1</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f1">1</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div>
+    <div class="rl" style="color:#085041">oak</div>
+    <div class="gc f1">1</div><div class="gc f1">1</div><div class="gc f1">1</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f1">1</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div>
+    <div class="rl" style="color:#085041">rose</div>
+    <div class="gc f1">1</div><div class="gc f1">1</div><div class="gc f0">0</div><div class="gc f1">1</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f1">1</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div>
+    <div class="rl" style="color:#085041">lily</div>
+    <div class="gc f1">1</div><div class="gc f1">1</div><div class="gc f0">0</div><div class="gc f1">1</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f1">1</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div>
+    <div class="rl" style="color:#712B13">sparrow</div>
+    <div class="gc f1">1</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f1">1</div><div class="gc f1">1</div><div class="gc f0">0</div><div class="gc f1">1</div><div class="gc f0">0</div><div class="gc f1">1</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f1">1</div>
+    <div class="rl" style="color:#712B13">penguin</div>
+    <div class="gc f1">1</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f1">1</div><div class="gc f1">1</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f1">1</div><div class="gc f1">1</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f1">1</div>
+    <div class="rl" style="color:#712B13">cat</div>
+    <div class="gc f1">1</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f1">1</div><div class="gc f0">0</div><div class="gc f1">1</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f1">1</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f1">1</div><div class="gc f0">0</div><div class="gc f0">0</div>
+    <div class="rl" style="color:#712B13">dog</div>
+    <div class="gc f1">1</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f1">1</div><div class="gc f0">0</div><div class="gc f1">1</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f1">1</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f0">0</div><div class="gc f1">1</div><div class="gc f0">0</div>
+  </div>
+
+  <div style="margin:12px 0 0;display:flex;gap:12px;flex-wrap:wrap">
+    <div style="font-size:11px;color:var(--color-text-secondary)">Shared features by hierarchy level:</div>
+    <div class="hier">
+      <span class="htag" style="background:#F1EFE8;color:#444441">all 8 share: is_living</span>
+      <span class="htag" style="background:#E1F5EE;color:#085041">4 plants share: is_plant</span>
+      <span class="htag" style="background:#FAECE7;color:#712B13">4 animals share: is_animal</span>
+      <span class="htag" style="background:#E1F5EE;color:#085041">2 trees: is_tree, has_bark</span>
+      <span class="htag" style="background:#FAECE7;color:#712B13">2 mammals: is_mammal</span>
+      <span class="htag" style="background:#FAECE7;color:#712B13">only dog: can_bark</span>
+    </div>
+  </div>
+
+  <div class="note">The correlation matrix Y'X has this hierarchical structure baked in. Its SVD pulls out modes ordered from most-shared (mode 1: everything is alive) to least-shared (modes 5–8: individual traits). The network learns these modes in that order — coarsest distinctions first.</div>
+</div>
+</div>

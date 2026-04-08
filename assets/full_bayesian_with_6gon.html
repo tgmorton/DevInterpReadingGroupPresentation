@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;font-family:'Source Sans 3',sans-serif;background:#fff;color:#3a3a3a}
+#app{display:flex;flex-direction:column;width:100%;height:100%;padding:10px 16px}
+
+.cr{display:flex;align-items:center;gap:10px;margin:4px 0}
+.cr label{font-size:13px;color:#7a7a7a;min-width:80px}
+.cr span{font-size:14px;font-weight:500;min-width:36px}
+.cr button{font-family:inherit;font-size:13px;padding:4px 12px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer}
+
+.sts{display:flex;gap:6px;margin:6px 0;flex-wrap:wrap}
+.st4{flex:1;min-width:70px;background:#f6f6f4;border-radius:6px;padding:4px 8px;text-align:center}
+.st4-n{font-size:14px;font-weight:500}.st4-l{font-size:10px;color:#7a7a7a;margin-top:1px}
+
+.charts{display:flex;flex-direction:column;flex:1;min-height:0;gap:4px}
+.chart-wrap{flex:1;display:flex;flex-direction:column;min-height:0}
+.plbl{font-size:12px;font-weight:600;color:#1a1a1a;margin:0 0 2px}
+.chart-wrap canvas{background:#f6f6f4;border-radius:6px;display:block}
+
+.note{font-size:12px;color:#7a7a7a;line-height:1.4;margin:4px 0 0}
+</style>
+</head>
+<body>
+<div id="app">
+
+<div class="cr">
+  <label>Sample size n</label>
+  <input type="range" min="50" max="1500" value="1000" step="10" id="nsl" style="flex:1" oninput="changeN()">
+  <span id="nv">1000</span>
+  <button id="pb4" onclick="tog4()">Train</button>
+  <button onclick="res4()">Reset</button>
+  <label>Speed</label>
+  <input type="range" min="1" max="8" value="3" step="1" id="sp4" style="width:60px">
+</div>
+
+<div class="sts">
+  <div class="st4"><div class="st4-n" id="y-phase" style="color:#c45a3c">—</div><div class="st4-l">SGD phase</div></div>
+  <div class="st4"><div class="st4-n" id="y-loss">—</div><div class="st4-l">Loss</div></div>
+  <div class="st4"><div class="st4-n" id="y-llc">—</div><div class="st4-l">λ̂</div></div>
+  <div class="st4"><div class="st4-n" id="y-ep">0</div><div class="st4-l">Epoch</div></div>
+  <div class="st4"><div class="st4-n" id="y-bpref">—</div><div class="st4-l">Bayesian prefers</div></div>
+  <div class="st4"><div class="st4-n" id="y-match">—</div><div class="st4-l">BAH status</div></div>
+</div>
+
+<div class="charts">
+  <div class="chart-wrap">
+    <div class="plbl">Bayesian posterior proportions (includes 6-gon, unreachable by SGD)</div>
+    <canvas id="cv-bay"></canvas>
+  </div>
+  <div class="chart-wrap">
+    <div class="plbl">SGD training trajectory (caps at 5⁺)</div>
+    <canvas id="cv-sgd"></canvas>
+  </div>
+</div>
+
+<div class="note" id="nt4"></div>
+
+</div>
+
+<script>
+const fg='#3a3a3a', mt='#7a7a7a';
+const bayPhases=[
+  {name:'4⁺⁺⁻',L:0.215,lam:2.6,c:0.5,color:'#c45a3c'},
+  {name:'4⁺',L:0.104,lam:5.8,c:2.0,color:'#c4933f'},
+  {name:'5',L:0.069,lam:7.0,c:3.6,color:'#2d5a7b'},
+  {name:'5⁺',L:0.062,lam:8.5,c:4.2,color:'#8b6eae'},
+  {name:'6',L:0.048,lam:8.5,c:6.4,color:'#5a8a5e'},
+];
+const sgdPhases=[
+  {name:'4⁺⁺⁻',loss:0.215,llc:2.6,color:'#c45a3c'},
+  {name:'4⁺',loss:0.104,llc:5.8,color:'#c4933f'},
+  {name:'5',loss:0.069,llc:7.0,color:'#2d5a7b'},
+  {name:'5⁺',loss:0.062,llc:8.5,color:'#8b6eae'},
+];
+const SGD_MAX_PHASE=3;
+const totalEp=4500;
+
+function Fn(p,n){return n*p.L+p.lam*Math.log(Math.max(2,n))+p.c;}
+function bayesProps(n){const fs=bayPhases.map(p=>Fn(p,Math.max(2,n)));const m=Math.min(...fs);const ex=fs.map(f=>Math.exp(-(f-m)));const Z=ex.reduce((a,b)=>a+b,0);return ex.map(e=>e/Z);}
+function bestBayesPhase(n){const bp=bayesProps(n);let mx=0,mi=0;bp.forEach((v,i)=>{if(v>mx){mx=v;mi=i;}});return mi;}
+function sgdFinalPhase(n){return Math.min(bestBayesPhase(n),SGD_MAX_PHASE);}
+
+function transForN(n){
+  const fp=sgdFinalPhase(n),noise=1/Math.sqrt(n/50),trs=[];
+  let ep=Math.round(300+noise*400);
+  for(let i=0;i<fp;i++){const dur=Math.round(80+noise*60);trs.push({start:ep,end:ep+dur,from:i,to:i+1});ep+=dur+Math.round(800+noise*300);}
+  return trs;
+}
+
+let curN=1000,epoch=0,playing=false,lossH=[],llcH=[],curTr=[];
+
+function changeN(){curN=parseInt(document.getElementById('nsl').value);document.getElementById('nv').textContent=curN;drawBay();drawSgd();updateNote();}
+function tog4(){playing=!playing;document.getElementById('pb4').textContent=playing?'Pause':'Train';if(playing){curTr=transForN(curN);run4();}}
+function res4(){playing=false;epoch=0;lossH=[];llcH=[];curTr=[];document.getElementById('pb4').textContent='Train';drawBay();drawSgd();updateNote();}
+
+function sgdPAt(ep,tr){for(let i=tr.length-1;i>=0;i--){if(ep>=tr[i].end)return tr[i].to;if(ep>=tr[i].start){return(ep-tr[i].start)/(tr[i].end-tr[i].start)<0.5?tr[i].from:tr[i].to;}}return 0;}
+
+function sgdL(ep,tr){
+  const pi=sgdPAt(ep,tr);let base=sgdPhases[pi].loss;
+  for(const t of tr){if(ep>=t.start&&ep<t.end){const s=(ep-t.start)/(t.end-t.start);const ss=s*s*(3-2*s);base=sgdPhases[t.from].loss+(sgdPhases[t.to].loss-sgdPhases[t.from].loss)*ss;}}
+  return base+(Math.random()-0.5)*0.003/Math.sqrt(curN/100);
+}
+function sgdLC(ep,tr){
+  const pi=sgdPAt(ep,tr);let base=sgdPhases[pi].llc;
+  for(const t of tr){if(ep>=t.start&&ep<t.end){const s=(ep-t.start)/(t.end-t.start);const ss=s*s*(3-2*s);base=sgdPhases[t.from].llc+(sgdPhases[t.to].llc-sgdPhases[t.from].llc)*ss;}}
+  return base+(Math.random()-0.5)*0.5;
+}
+
+function step4(){
+  const sp=parseInt(document.getElementById('sp4').value);
+  for(let i=0;i<sp*3;i++){if(epoch>=totalEp)break;epoch++;lossH.push(sgdL(epoch,curTr));llcH.push(sgdLC(epoch,curTr));}
+  drawBay();drawSgd();updateStats();
+  if(epoch>=totalEp){playing=false;document.getElementById('pb4').textContent='Train';}
+}
+function run4(){if(!playing)return;step4();requestAnimationFrame(run4);}
+
+function updateStats(){
+  const pi=sgdPAt(epoch,curTr),p=sgdPhases[pi],bpi=bestBayesPhase(curN);
+  document.getElementById('y-phase').textContent=p.name;document.getElementById('y-phase').style.color=p.color;
+  document.getElementById('y-loss').textContent=(lossH.length?lossH[lossH.length-1]:0).toFixed(3);
+  document.getElementById('y-llc').textContent=(llcH.length?llcH[llcH.length-1]:0).toFixed(1);
+  document.getElementById('y-ep').textContent=epoch;
+  document.getElementById('y-bpref').textContent=bayPhases[bpi].name;document.getElementById('y-bpref').style.color=bayPhases[bpi].color;
+  if(bpi<=SGD_MAX_PHASE&&pi===bpi){document.getElementById('y-match').textContent='Aligned';document.getElementById('y-match').style.color='#5a8a5e';}
+  else if(bpi>SGD_MAX_PHASE){document.getElementById('y-match').textContent='BAH gap';document.getElementById('y-match').style.color='#c45a3c';}
+  else{document.getElementById('y-match').textContent='Catching up';document.getElementById('y-match').style.color='#c4933f';}
+}
+
+function updateNote(){
+  const bpi=bestBayesPhase(curN),bp=bayesProps(curN);
+  let txt=`n=${curN}: `;
+  bayPhases.forEach((p,i)=>{const pct=(bp[i]*100).toFixed(0);if(pct>0)txt+=`${p.name}=${pct}% `;});
+  if(bpi>SGD_MAX_PHASE) txt+=`| Bayesian prefers ${bayPhases[bpi].name}, but SGD caps at ${sgdPhases[SGD_MAX_PHASE].name}. The 5→6 dynamical transition was never observed — the energy barrier is too high.`;
+  else txt+=`| Bayesian and SGD agree on ${bayPhases[bpi].name}.`;
+  document.getElementById('nt4').textContent=txt;
+}
+
+function setupCanvas(id){
+  const cv=document.getElementById(id);
+  const dpr=window.devicePixelRatio||1;
+  const parent=cv.parentElement;
+  const w=parent.clientWidth;
+  const h=parent.clientHeight - (parent.querySelector('.plbl')?.offsetHeight||0) - 4;
+  cv.style.width=w+'px';
+  cv.style.height=h+'px';
+  cv.width=w*dpr;
+  cv.height=h*dpr;
+  const ctx=cv.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  return{ctx,w,h};
+}
+
+function drawBay(){
+  const{ctx,w,h}=setupCanvas('cv-bay');
+  const pad={l:40,r:80,t:10,b:28},pw=w-pad.l-pad.r,ph=h-pad.t-pad.b;
+  const nMin=30,nMax=1600;
+  function nToX(n){return pad.l+((n-nMin)/(nMax-nMin))*pw;}
+  function pToY(p){return pad.t+ph-p*ph;}
+
+  ctx.strokeStyle='rgba(0,0,0,0.06)';ctx.lineWidth=0.5;
+  ctx.beginPath();ctx.moveTo(pad.l,pad.t);ctx.lineTo(pad.l,pad.t+ph);ctx.lineTo(pad.l+pw,pad.t+ph);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(pad.l,pToY(0.5));ctx.lineTo(pad.l+pw,pToY(0.5));ctx.setLineDash([3,3]);ctx.stroke();ctx.setLineDash([]);
+
+  ctx.fillStyle=mt;ctx.font="11px 'Source Sans 3'";
+  ctx.textAlign='right';
+  for(let p=0;p<=1;p+=0.25){
+    ctx.fillText(p.toFixed(p===0||p===1?0:2),pad.l-4,pToY(p)+4);
+    if(p>0&&p<1){ctx.beginPath();ctx.moveTo(pad.l,pToY(p));ctx.lineTo(pad.l+pw,pToY(p));ctx.strokeStyle='rgba(0,0,0,0.04)';ctx.lineWidth=0.5;ctx.stroke();}
+  }
+  ctx.textAlign='center';for(let n=200;n<=nMax;n+=400)ctx.fillText(n,nToX(n),pad.t+ph+14);
+  ctx.fillText('n',pad.l+pw/2,h-2);
+
+  bayPhases.forEach((p,pi)=>{
+    ctx.beginPath();
+    for(let n=nMin;n<=nMax;n+=3){const bp=bayesProps(n);const x=nToX(n),y=pToY(bp[pi]);n===nMin?ctx.moveTo(x,y):ctx.lineTo(x,y);}
+    ctx.strokeStyle=p.color;ctx.lineWidth=pi>SGD_MAX_PHASE?3:2.5;
+    if(pi>SGD_MAX_PHASE)ctx.setLineDash([6,4]);
+    ctx.stroke();ctx.setLineDash([]);
+    const ebp=bayesProps(nMax);
+    if(ebp[pi]>0.03){ctx.fillStyle=p.color;ctx.font="600 12px 'Source Sans 3'";ctx.textAlign='left';
+      let lbl=p.name;if(pi>SGD_MAX_PHASE)lbl+=' (no SGD)';
+      ctx.fillText(lbl,nToX(nMax)+4,pToY(ebp[pi])+4);}
+  });
+
+  const cx=nToX(curN);
+  ctx.beginPath();ctx.moveTo(cx,pad.t);ctx.lineTo(cx,pad.t+ph);ctx.strokeStyle=fg;ctx.lineWidth=1.5;ctx.globalAlpha=0.4;ctx.stroke();ctx.globalAlpha=1;
+  const cbp=bayesProps(curN);
+  bayPhases.forEach((p,pi)=>{if(cbp[pi]>0.03){ctx.beginPath();ctx.arc(cx,pToY(cbp[pi]),4,0,Math.PI*2);ctx.fillStyle=p.color;ctx.fill();}});
+}
+
+function drawSgd(){
+  const{ctx,w,h}=setupCanvas('cv-sgd');
+  const pad={l:40,r:40,t:10,b:28},pw=w-pad.l-pad.r,ph=h-pad.t-pad.b;
+  const lMin=0.04,lMax=0.25,llcMin=0,llcMax=11;
+  function eToX(e){return pad.l+(e/totalEp)*pw;}
+  function lToY(l){return pad.t+ph-((l-lMin)/(lMax-lMin))*ph;}
+  function llcToY(l){return pad.t+ph-((l-llcMin)/(llcMax-llcMin))*ph;}
+
+  ctx.strokeStyle='rgba(0,0,0,0.06)';ctx.lineWidth=0.5;
+  ctx.beginPath();ctx.moveTo(pad.l,pad.t);ctx.lineTo(pad.l,pad.t+ph);ctx.lineTo(pad.l+pw,pad.t+ph);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(pad.l+pw,pad.t);ctx.lineTo(pad.l+pw,pad.t+ph);ctx.stroke();
+
+  // Loss y-axis ticks (left)
+  ctx.font="11px 'Source Sans 3'";ctx.textAlign='right';
+  for(let l=0.05;l<=0.25;l+=0.05){
+    ctx.fillStyle='#c45a3c';ctx.globalAlpha=0.6;ctx.fillText(l.toFixed(2),pad.l-4,lToY(l)+4);
+    ctx.beginPath();ctx.moveTo(pad.l,lToY(l));ctx.lineTo(pad.l+pw,lToY(l));ctx.strokeStyle='rgba(0,0,0,0.04)';ctx.lineWidth=0.5;ctx.globalAlpha=0.3;ctx.stroke();ctx.globalAlpha=1;
+  }
+  // LLC y-axis ticks (right)
+  ctx.textAlign='left';
+  for(let l=2;l<=10;l+=2){ctx.fillStyle='#2d5a7b';ctx.globalAlpha=0.6;ctx.fillText(l,pad.l+pw+4,llcToY(l)+4);ctx.globalAlpha=1;}
+
+  ctx.fillStyle='#c45a3c';ctx.font="11px 'Source Sans 3'";ctx.textAlign='right';ctx.fillText('Loss',pad.l-4,pad.t+10);
+  ctx.fillStyle='#2d5a7b';ctx.textAlign='left';ctx.fillText('λ̂',pad.l+pw+4,pad.t+10);
+  ctx.fillStyle=mt;ctx.textAlign='center';for(let e=0;e<=totalEp;e+=1000)ctx.fillText(e,eToX(e),pad.t+ph+14);
+  ctx.fillText('Epoch',pad.l+pw/2,h-2);
+
+  // Phase bands
+  const fp=sgdFinalPhase(curN),projTr=transForN(curN);
+  const allT=[...projTr,{start:totalEp,end:totalEp,from:fp,to:fp}];
+  allT.forEach((tr,ti)=>{
+    const fromE=ti===0?0:projTr[ti-1].end,toE=tr.start;
+    const pi=ti===0?0:projTr[ti-1].to;
+    if(toE-fromE>100){
+      ctx.fillStyle=sgdPhases[pi].color;ctx.globalAlpha=0.06;
+      ctx.fillRect(eToX(fromE),pad.t,eToX(toE)-eToX(fromE),ph);ctx.globalAlpha=1;
+      if(toE-fromE>250){ctx.fillStyle=sgdPhases[pi].color;ctx.globalAlpha=0.4;ctx.font="500 13px 'Source Sans 3'";ctx.textAlign='center';ctx.fillText(sgdPhases[pi].name,eToX((fromE+toE)/2),pad.t+14);ctx.globalAlpha=1;}
+    }
+  });
+
+  // 6-gon reference if BAH gap
+  if(bestBayesPhase(curN)>SGD_MAX_PHASE){
+    ctx.setLineDash([6,4]);ctx.strokeStyle='#5a8a5e';ctx.lineWidth=1.5;ctx.globalAlpha=0.4;
+    ctx.beginPath();ctx.moveTo(pad.l,lToY(0.048));ctx.lineTo(pad.l+pw,lToY(0.048));ctx.stroke();
+    ctx.setLineDash([]);ctx.globalAlpha=0.5;ctx.fillStyle='#5a8a5e';ctx.font="11px 'Source Sans 3'";ctx.textAlign='left';
+    ctx.fillText('6-gon (unreachable)',pad.l+8,lToY(0.048)-5);ctx.globalAlpha=1;
+  }
+
+  if(lossH.length>1){ctx.beginPath();lossH.forEach((l,i)=>{const x=eToX(i),y=lToY(l);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});ctx.strokeStyle='#c45a3c';ctx.lineWidth=2;ctx.stroke();}
+  if(llcH.length>1){ctx.beginPath();llcH.forEach((l,i)=>{const x=eToX(i),y=llcToY(l);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});ctx.strokeStyle='#2d5a7b';ctx.lineWidth=2;ctx.stroke();}
+  if(epoch>0){ctx.beginPath();ctx.moveTo(eToX(epoch),pad.t);ctx.lineTo(eToX(epoch),pad.t+ph);ctx.strokeStyle=fg;ctx.lineWidth=1;ctx.globalAlpha=0.2;ctx.stroke();ctx.globalAlpha=1;}
+}
+
+changeN();
+requestAnimationFrame(()=>requestAnimationFrame(()=>{drawBay();drawSgd();updateNote();}));
+window.addEventListener('resize',()=>{drawBay();drawSgd();});
+</script>
+</body></html>

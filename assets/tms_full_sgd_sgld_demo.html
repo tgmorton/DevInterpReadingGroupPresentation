@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;font-family:'Source Sans 3',sans-serif;background:#fff;color:#3a3a3a}
+#app{display:flex;flex-direction:column;width:100%;height:100%;padding:10px 16px}
+#wrap{display:flex;gap:10px;flex:1;min-height:0}
+#vec-panel{width:240px;background:#f6f6f4;border-radius:6px;padding:6px;display:flex;align-items:center;justify-content:center}
+#vec-panel canvas{width:100%;height:100%}
+#charts{flex:1;display:flex;flex-direction:column;gap:6px}
+.chart-box{flex:1;background:#f6f6f4;border-radius:6px;padding:6px;min-height:0;display:flex;flex-direction:column}
+.chart-box canvas{flex:1;width:100%}
+.stats{display:flex;gap:6px;margin:6px 0 0}
+.st{background:#f6f6f4;border-radius:6px;padding:5px 8px;text-align:center;flex:1}
+.st-n{font-size:14px;font-weight:500;color:#1a1a1a}
+.st-l{font-size:10px;color:#7a7a7a}
+.sgld-ind{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:3px;vertical-align:middle;background:#a8a8a8}
+.ctrls{display:flex;gap:8px;align-items:center;margin:6px 0 0;flex-wrap:wrap}
+.ctrls button{font-family:inherit;font-size:12px;padding:3px 10px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer}
+.ctrls label{font-size:12px;color:#7a7a7a}
+.ctrls select{font-family:inherit;font-size:12px;padding:2px 6px;border:1px solid #ddd;border-radius:4px}
+</style>
+</head>
+<body>
+<div id="app">
+<div id="wrap">
+  <div id="vec-panel"><canvas id="vec-cv"></canvas></div>
+  <div id="charts">
+    <div class="chart-box"><canvas id="loss-cv"></canvas></div>
+    <div class="chart-box"><canvas id="llc-cv"></canvas></div>
+  </div>
+</div>
+<div class="stats">
+  <div class="st"><div class="st-n" id="s-epoch">0</div><div class="st-l">Epoch</div></div>
+  <div class="st"><div class="st-n" id="s-loss">—</div><div class="st-l">Loss</div></div>
+  <div class="st"><div class="st-n" id="s-llc">—</div><div class="st-l">LLC λ̂</div></div>
+  <div class="st"><div class="st-n" id="s-phase">—</div><div class="st-l">Phase</div></div>
+  <div class="st"><div class="st-n"><span class="sgld-ind" id="sgld-dot"></span><span id="s-sgld">Idle</span></div><div class="st-l">SGLD sampler</div></div>
+</div>
+<div class="ctrls">
+  <button id="play-btn" onclick="toggle()">Start training</button>
+  <button onclick="reset()">Reset</button>
+  <label>Speed</label>
+  <input type="range" min="1" max="50" value="10" step="1" id="speed" style="width:80px">
+  <span id="speed-v" style="font-size:12px;min-width:90px">10 epochs/frame</span>
+  <label>Estimate λ̂ every</label>
+  <select id="llc-freq"><option value="30">30 ep</option><option value="60" selected>60 ep</option><option value="120">120 ep</option></select>
+</div>
+</div>
+
+<script>
+const C=6, R=2;
+const colors=['#c45a3c','#2d5a7b','#5a8a5e','#c4933f','#8b6eae','#D4537E'];
+const bg='#f6f6f4', fg='#3a3a3a', mt='#7a7a7a', gridC='rgba(0,0,0,0.06)';
+
+let W, b, epoch, running=false, lossHist, llcHist, llcEpochs;
+
+function randn(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+
+function init(){
+  // Start near 4-gon with small noise
+  W=[[1,0],[0,1],[-1,0],[0,-1],[0.02*randn(),0.02*randn()],[0.02*randn(),0.02*randn()]];
+  for(let j=0;j<4;j++){W[j][0]+=0.03*randn();W[j][1]+=0.03*randn();}
+  b=[0,0,0,0,-0.5,-0.5];
+  for(let j=0;j<4;j++) b[j]+=0.01*randn();
+  epoch=0; lossHist=[]; llcHist=[]; llcEpochs=[];
+}
+
+function forward(Wl, bl, m, mu){
+  // Encode: h = W_m * mu
+  const h = [Wl[m][0]*mu, Wl[m][1]*mu];
+  // Decode: y_j = W_j · h + b_j, then ReLU
+  const y=[], f=[];
+  for(let j=0;j<C;j++){
+    y[j] = Wl[j][0]*h[0] + Wl[j][1]*h[1] + bl[j];
+    f[j] = Math.max(0, y[j]);
+  }
+  // Loss: sum_j (target_j - f_j)^2, target_j = mu if j==m else 0
+  let loss=0;
+  for(let j=0;j<C;j++){const t=j===m?mu:0; loss+=(t-f[j])**2;}
+  return {h, y, f, loss};
+}
+
+function computeGrad(Wl, bl, batch){
+  const gW = Array.from({length:C},()=>[0,0]);
+  const gB = new Array(C).fill(0);
+  let totalLoss = 0;
+
+  for(const [m, mu] of batch){
+    const {h, y, f, loss} = forward(Wl, bl, m, mu);
+    totalLoss += loss;
+
+    // d loss/d f_j = -2*(target_j - f_j)
+    // d f_j/d pre_j = (y_j > 0 ? 1 : 0)  (ReLU derivative)
+    // pre_j = sum_a W_j[a] * h[a] + b_j
+    // h[a] = W_m[a] * mu
+    //
+    // d loss/d W_j[a]:
+    //   via output: delta_j * h[a]  (for the decode weight)
+    //   via hidden (if j==m): sum_k delta_k * W_k[a] * mu  (for the encode weight, but W is tied)
+    //   Since W is tied (encode = W, decode = W^T), we sum both paths
+
+    const delta = [];
+    for(let j=0;j<C;j++){
+      const t = j===m ? mu : 0;
+      delta[j] = -2*(t - f[j]) * (y[j]>0 ? 1 : 0);
+    }
+
+    for(let j=0;j<C;j++){
+      for(let a=0;a<R;a++){
+        // Gradient through decode path: delta_j * h[a]
+        let g = delta[j] * h[a];
+        // Gradient through encode path (only for j==m since h = W_m * mu):
+        if(j===m){
+          let encGrad = 0;
+          for(let k=0;k<C;k++) encGrad += delta[k] * Wl[k][a];
+          g += encGrad * mu;
+        }
+        gW[j][a] += g;
+      }
+      gB[j] += delta[j];
+    }
+  }
+
+  const n = batch.length;
+  for(let j=0;j<C;j++){gW[j][0]/=n; gW[j][1]/=n; gB[j]/=n;}
+  return {gW, gB, loss: totalLoss/n};
+}
+
+function popLoss(Wl, bl){
+  let total=0; const N=100;
+  for(let m=0;m<C;m++){
+    for(let s=0;s<N;s++){
+      total += forward(Wl, bl, m, (s+0.5)/N).loss;
+    }
+  }
+  return total/(C*N);
+}
+
+function sgdStep(){
+  const lr=0.003;
+  const batch=[];
+  for(let i=0;i<20;i++) batch.push([Math.floor(Math.random()*C), Math.random()]);
+  const {gW, gB} = computeGrad(W, b, batch);
+  for(let j=0;j<C;j++){
+    W[j][0] -= lr*gW[j][0];
+    W[j][1] -= lr*gW[j][1];
+    b[j] -= lr*gB[j];
+  }
+}
+
+function estimateLLC(){
+  document.getElementById('sgld-dot').style.background='#5a8a5e';
+  document.getElementById('s-sgld').textContent='Sampling...';
+  const eps=0.0003, n=300;
+  const Ws=W.map(c=>[...c]), bs=[...b];
+  const baseLoss=popLoss(Ws,bs);
+  let wbicSum=0;
+  const steps=60;
+  for(let t=0;t<steps;t++){
+    const batch=[];
+    for(let i=0;i<n;i++) batch.push([Math.floor(Math.random()*C), Math.random()]);
+    const {gW,gB}=computeGrad(Ws,bs,batch);
+    for(let j=0;j<C;j++){
+      Ws[j][0]-=eps*gW[j][0]+Math.sqrt(2*eps)*randn();
+      Ws[j][1]-=eps*gW[j][1]+Math.sqrt(2*eps)*randn();
+      bs[j]-=eps*gB[j]+Math.sqrt(2*eps)*randn();
+    }
+    wbicSum+=popLoss(Ws,bs);
+  }
+  const lambda = n*(wbicSum/steps - baseLoss)/Math.log(n);
+  document.getElementById('sgld-dot').style.background='#a8a8a8';
+  document.getElementById('s-sgld').textContent='Idle';
+  return Math.max(0, lambda);
+}
+
+function classifyPhase(){
+  let active=0;
+  for(let j=0;j<C;j++) if(Math.sqrt(W[j][0]**2+W[j][1]**2)>0.3) active++;
+  if(active<=3) return '≤3';
+  if(active===4) return '4-gon';
+  if(active===5) return '5-gon';
+  return '6-gon';
+}
+
+// ── Drawing ──
+
+function setupCanvas(id){
+  const cv=document.getElementById(id);
+  const dpr=window.devicePixelRatio||1;
+  const rect=cv.getBoundingClientRect();
+  cv.width=rect.width*dpr;
+  cv.height=rect.height*dpr;
+  const ctx=cv.getContext('2d');
+  ctx.scale(dpr,dpr);
+  return {ctx, w:rect.width, h:rect.height};
+}
+
+function drawVectors(){
+  const {ctx,w,h}=setupCanvas('vec-cv');
+  ctx.clearRect(0,0,w,h);
+  const cx=w/2,cy=h/2,sc=Math.min(w,h)*0.32;
+
+  ctx.strokeStyle=gridC;ctx.lineWidth=1;
+  ctx.beginPath();ctx.arc(cx,cy,sc,0,Math.PI*2);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(cx-sc*1.3,cy);ctx.lineTo(cx+sc*1.3,cy);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(cx,cy-sc*1.3);ctx.lineTo(cx,cy+sc*1.3);ctx.stroke();
+
+  const hull=[];
+  for(let j=0;j<C;j++){
+    const len=Math.sqrt(W[j][0]**2+W[j][1]**2);
+    const ex=cx+W[j][0]*sc, ey=cy-W[j][1]*sc;
+    ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(ex,ey);
+    ctx.strokeStyle=colors[j];ctx.lineWidth=len>0.3?2.5:1;ctx.globalAlpha=len>0.3?1:0.3;ctx.stroke();
+    ctx.beginPath();ctx.arc(ex,ey,len>0.3?5:3,0,Math.PI*2);ctx.fillStyle=colors[j];ctx.fill();
+    ctx.globalAlpha=1;
+    if(len>0.3) hull.push([ex,ey]);
+    ctx.fillStyle=fg;ctx.font="500 13px 'Source Sans 3'";ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(''+(j+1), cx+W[j][0]*sc*1.18, cy-W[j][1]*sc*1.18);
+  }
+  if(hull.length>=3){
+    const ctr=[hull.reduce((s,p)=>s+p[0],0)/hull.length, hull.reduce((s,p)=>s+p[1],0)/hull.length];
+    hull.sort((a,b)=>Math.atan2(a[1]-ctr[1],a[0]-ctr[0])-Math.atan2(b[1]-ctr[1],b[0]-ctr[0]));
+    ctx.beginPath();ctx.moveTo(hull[0][0],hull[0][1]);
+    for(let i=1;i<hull.length;i++)ctx.lineTo(hull[i][0],hull[i][1]);
+    ctx.closePath();ctx.strokeStyle=mt;ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.stroke();ctx.setLineDash([]);
+  }
+}
+
+function drawChart(cvId, data, epochs, color, label, refLines){
+  const {ctx,w,h}=setupCanvas(cvId);
+  ctx.clearRect(0,0,w,h);
+  const pad={l:50,r:12,t:16,b:22};
+  const pw=w-pad.l-pad.r, ph=h-pad.t-pad.b;
+  if(data.length<2) return;
+
+  let minV=Infinity,maxV=-Infinity;
+  for(const v of data){if(v<minV)minV=v;if(v>maxV)maxV=v;}
+  if(refLines) for(const r of refLines){if(r.v<minV)minV=r.v;if(r.v>maxV)maxV=r.v;}
+  const margin=(maxV-minV)*0.15||0.01;
+  minV-=margin;maxV+=margin;
+
+  // Grid
+  ctx.strokeStyle=gridC;ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(pad.l,pad.t);ctx.lineTo(pad.l,pad.t+ph);ctx.lineTo(pad.l+pw,pad.t+ph);ctx.stroke();
+  ctx.fillStyle=mt;ctx.font="12px 'Source Sans 3'";ctx.textAlign='right';ctx.textBaseline='middle';
+  for(let i=0;i<=3;i++){
+    const v=minV+(maxV-minV)*i/3, y=pad.t+ph-(i/3)*ph;
+    ctx.fillText(v.toFixed(v>1?1:3),pad.l-4,y);
+    ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+pw,y);ctx.strokeStyle=gridC;ctx.stroke();
+  }
+
+  // Reference lines
+  if(refLines) for(const r of refLines){
+    const ry=pad.t+ph-((r.v-minV)/(maxV-minV))*ph;
+    ctx.beginPath();ctx.setLineDash([4,4]);ctx.moveTo(pad.l,ry);ctx.lineTo(pad.l+pw,ry);
+    ctx.strokeStyle=r.c;ctx.lineWidth=1;ctx.globalAlpha=0.5;ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1;
+    ctx.fillStyle=r.c;ctx.font="11px 'Source Sans 3'";ctx.textAlign='left';
+    ctx.fillText(r.l,pad.l+pw-70,ry-5);
+  }
+
+  // Data line
+  const maxE=Math.max(epochs[epochs.length-1],100);
+  ctx.beginPath();
+  for(let i=0;i<data.length;i++){
+    const x=pad.l+(epochs[i]/maxE)*pw, y=pad.t+ph-((data[i]-minV)/(maxV-minV))*ph;
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  }
+  ctx.strokeStyle=color;ctx.lineWidth=2;ctx.stroke();
+
+  // Label
+  ctx.fillStyle=fg;ctx.font="600 13px 'Source Sans 3'";ctx.textAlign='left';
+  ctx.fillText(label,pad.l+4,pad.t+12);
+}
+
+function updateDisplay(){
+  drawVectors();
+  const lossEpochs=lossHist.map((_,i)=>i*5);
+  drawChart('loss-cv',lossHist,lossEpochs,'#c45a3c','Loss',[
+    {v:0.1111,c:'#c4933f',l:'4-gon'},
+    {v:0.0687,c:'#2d5a7b',l:'5-gon'},
+    {v:0.0482,c:'#5a8a5e',l:'6-gon'}
+  ]);
+  if(llcHist.length>0){
+    drawChart('llc-cv',llcHist,llcEpochs,'#2d5a7b','Estimated LLC λ̂',[
+      {v:5,c:'#c4933f',l:'4-gon ~5'},
+      {v:7,c:'#2d5a7b',l:'5-gon =7'},
+      {v:8.5,c:'#5a8a5e',l:'6-gon =8.5'}
+    ]);
+  }
+  document.getElementById('s-epoch').textContent=epoch;
+  document.getElementById('s-loss').textContent=lossHist.length>0?lossHist[lossHist.length-1].toFixed(4):'—';
+  document.getElementById('s-llc').textContent=llcHist.length>0?llcHist[llcHist.length-1].toFixed(1):'—';
+  document.getElementById('s-phase').textContent=classifyPhase();
+}
+
+function trainFrame(){
+  if(!running) return;
+  const spd=parseInt(document.getElementById('speed').value);
+  document.getElementById('speed-v').textContent=spd+' ep/frame';
+  const llcFreq=parseInt(document.getElementById('llc-freq').value);
+  for(let s=0;s<spd;s++){
+    sgdStep();
+    epoch++;
+    if(epoch%5===0) lossHist.push(popLoss(W,b));
+    if(epoch%llcFreq===0 && epoch>0){
+      llcHist.push(estimateLLC());
+      llcEpochs.push(epoch);
+    }
+  }
+  updateDisplay();
+  requestAnimationFrame(trainFrame);
+}
+
+function toggle(){
+  running=!running;
+  document.getElementById('play-btn').textContent=running?'Pause':'Resume';
+  if(running) trainFrame();
+}
+
+function reset(){
+  running=false;
+  document.getElementById('play-btn').textContent='Start training';
+  init();
+  updateDisplay();
+}
+
+init();
+requestAnimationFrame(()=>requestAnimationFrame(()=>updateDisplay()));
+</script>
+</body></html>

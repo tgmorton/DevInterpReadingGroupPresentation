@@ -1,0 +1,146 @@
+<style>
+.w{padding:0.5rem 0}
+.items{display:flex;gap:3px;margin:0 0 8px;flex-wrap:wrap}
+.items button{font-size:12px;padding:4px 10px;border-radius:var(--border-radius-md);cursor:pointer;border:0.5px solid var(--color-border-tertiary);background:var(--color-background-primary);color:var(--color-text-secondary);transition:all .15s}
+.stages{display:flex;gap:3px;margin:0 0 10px;flex-wrap:wrap}
+.stages button{font-size:12px;padding:5px 12px;border-radius:var(--border-radius-md);cursor:pointer;border:0.5px solid var(--color-border-tertiary);background:var(--color-background-primary);color:var(--color-text-secondary);transition:all .15s}
+.stinfo{font-size:12px;color:var(--color-text-secondary);margin:0 0 10px;line-height:1.6}
+.tbl{width:100%;border-collapse:separate;border-spacing:2px;font-size:12px}
+.tbl th{text-align:left;font-weight:400;color:var(--color-text-secondary);padding:4px 6px;font-size:11px;white-space:nowrap}
+.tbl td{padding:4px 8px;border-radius:3px;text-align:center;font-family:var(--font-mono);font-size:12px;min-width:36px}
+.tbl .rl{text-align:left;font-weight:500;font-size:12px;font-family:inherit;background:none;min-width:70px}
+.grp{font-size:10px;color:var(--color-text-tertiary);padding:2px 6px;background:none;text-align:center}
+</style>
+<div class="w">
+<div style="font-size:12px;color:var(--color-text-secondary);margin:0 0 4px">Select item:</div>
+<div class="items" id="items"></div>
+<div style="font-size:12px;color:var(--color-text-secondary);margin:0 0 4px">Learning stage:</div>
+<div class="stages" id="stages"></div>
+<div class="stinfo" id="stinfo"></div>
+<table class="tbl" id="tbl"></table>
+</div>
+<script>
+const names=['pine','oak','rose','lily','sparrow','penguin','cat','dog'];
+const icols=['#2d5a7b','#85B7EB','#E24B4A','#ED93B1','#534AB7','#1D9E75','#D85A30','#BA7517'];
+const feats=['is_living','is_plant','is_tree','is_flower','is_animal','is_bird','is_mammal','can_fly','can_swim','has_legs','has_bark','has_petals','can_purr','can_bark','has_beak'];
+const fgroups=['all','kingdom','subtype','subtype','kingdom','subtype','subtype','individual','individual','kingdom','subtype','subtype','individual','individual','subtype'];
+
+const Y=[
+  [1,1,1,0,0,0,0,0,0,0,1,0,0,0,0],
+  [1,1,1,0,0,0,0,0,0,0,1,0,0,0,0],
+  [1,1,0,1,0,0,0,0,0,0,0,1,0,0,0],
+  [1,1,0,1,0,0,0,0,0,0,0,1,0,0,0],
+  [1,0,0,0,1,1,0,1,0,1,0,0,0,0,1],
+  [1,0,0,0,1,1,0,0,1,1,0,0,0,0,1],
+  [1,0,0,0,1,0,1,0,0,1,0,0,1,0,0],
+  [1,0,0,0,1,0,1,0,0,1,0,0,0,1,0],
+];
+
+function avg(indices){
+  const v=new Array(15).fill(0);
+  indices.forEach(i=>{for(let f=0;f<15;f++)v[f]+=Y[i][f];});
+  for(let f=0;f<15;f++)v[f]/=indices.length;
+  return v;
+}
+
+const globalAvg=avg([0,1,2,3,4,5,6,7]);
+const plantAvg=avg([0,1,2,3]);
+const animalAvg=avg([4,5,6,7]);
+const treeAvg=avg([0,1]);
+const flowerAvg=avg([2,3]);
+const birdAvg=avg([4,5]);
+const mammalAvg=avg([6,7]);
+
+const membership=[
+  {group:'plant',sub:'tree'},
+  {group:'plant',sub:'tree'},
+  {group:'plant',sub:'flower'},
+  {group:'plant',sub:'flower'},
+  {group:'animal',sub:'bird'},
+  {group:'animal',sub:'bird'},
+  {group:'animal',sub:'mammal'},
+  {group:'animal',sub:'mammal'},
+];
+
+function getPred(item,stage){
+  if(stage===0)return new Array(15).fill(0);
+  if(stage===1)return globalAvg;
+  if(stage===2)return membership[item].group==='plant'?plantAvg:animalAvg;
+  if(stage===3){
+    const s=membership[item].sub;
+    if(s==='tree')return treeAvg;
+    if(s==='flower')return flowerAvg;
+    if(s==='bird')return birdAvg;
+    return mammalAvg;
+  }
+  return Y[item].slice();
+}
+
+const stageInfo=[
+  {name:'Before training',desc:'No modes learned. The network predicts zero for everything — it has no knowledge yet.'},
+  {name:'Mode 1 learned',desc:'s = 4.0 — "all living things." Every item gets the same prediction: the global average across all 8 items. Dog looks identical to pine.'},
+  {name:'Modes 1–2',desc:'s = 2.8 — "animal vs plant." Items split into two clusters. Dog, cat, sparrow, penguin share one prediction. Pine, oak, rose, lily share another.'},
+  {name:'Modes 1–4',desc:'s = 1.6 — "mammal/bird, tree/flower." Four clusters now. Dog and cat share a prediction. Sparrow and penguin share another. But dog and cat are still identical.'},
+  {name:'All modes',desc:'s = 0.55 — individual distinctions. Each item finally has its own unique prediction matching the true feature vector.'},
+];
+
+let selItem=7,selStage=1;
+
+function cellColor(val,isTarget){
+  if(val>=0.9)return isTarget?'#085041':'#E1F5EE';
+  if(val>=0.4)return isTarget?'#854F0B':'#FAEEDA';
+  return 'var(--color-background-secondary)';
+}
+function cellText(val,isTarget){
+  if(val>=0.9)return isTarget?'#E1F5EE':'#085041';
+  if(val>=0.4)return isTarget?'#FAEEDA':'#854F0B';
+  return 'var(--color-text-tertiary)';
+}
+
+function render(){
+  document.getElementById('stinfo').innerHTML='<strong>'+stageInfo[selStage].name+':</strong> '+stageInfo[selStage].desc;
+  const pred=getPred(selItem,selStage);
+  const target=Y[selItem];
+  let h='<tr><th></th>';
+  feats.forEach(f=>{h+='<th>'+f.replace('is_','').replace('has_','').replace('can_','')+'</th>';});
+  h+='</tr>';
+  h+='<tr><td class="grp"></td>';
+  fgroups.forEach(g=>{
+    const c=g==='all'?'#888780':g==='kingdom'?'#0F6E56':g==='subtype'?'#854F0B':'#534AB7';
+    h+='<td class="grp" style="color:'+c+'">'+g+'</td>';
+  });
+  h+='</tr>';
+  h+='<tr><td class="rl" style="color:'+icols[selItem]+'">predicted</td>';
+  for(let f=0;f<15;f++){
+    const v=pred[f];
+    const match=Math.abs(v-target[f])<0.01;
+    h+='<td style="background:'+cellColor(v,false)+';color:'+cellText(v,false)+(match&&selStage>0?';outline:1.5px solid #1D9E75':'')+'">'+(v===Math.round(v)?v.toFixed(0):v.toFixed(2))+'</td>';
+  }
+  h+='</tr>';
+  h+='<tr><td class="rl" style="color:var(--color-text-secondary)">true target</td>';
+  for(let f=0;f<15;f++){
+    const v=target[f];
+    h+='<td style="background:'+cellColor(v,true)+';color:'+cellText(v,true)+'">'+v+'</td>';
+  }
+  h+='</tr>';
+  document.getElementById('tbl').innerHTML=h;
+}
+
+const itemsEl=document.getElementById('items');
+names.forEach((n,i)=>{
+  const b=document.createElement('button');b.textContent=n;b.style.borderColor=icols[i];
+  if(i===selItem){b.style.background=icols[i];b.style.color='#fff';}
+  b.onclick=()=>{selItem=i;itemsEl.querySelectorAll('button').forEach((bb,bi)=>{bb.style.background=bi===i?icols[bi]:'';bb.style.color=bi===i?'#fff':'';});render();};
+  itemsEl.appendChild(b);
+});
+
+const stagesEl=document.getElementById('stages');
+stageInfo.forEach((s,i)=>{
+  const b=document.createElement('button');b.textContent=s.name;
+  if(i===selStage){b.style.background='var(--color-text-primary)';b.style.color='var(--color-background-primary)';}
+  b.onclick=()=>{selStage=i;stagesEl.querySelectorAll('button').forEach((bb,bi)=>{bb.style.background=bi===i?'var(--color-text-primary)':'';bb.style.color=bi===i?'var(--color-background-primary)':'';});render();};
+  stagesEl.appendChild(b);
+});
+
+render();
+</script>

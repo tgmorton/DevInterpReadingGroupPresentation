@@ -1,0 +1,285 @@
+<style>
+:root{--color-background-secondary:#f6f6f4;--color-text-primary:#1a1a1a;--color-text-secondary:#7a7a7a;--border-radius-lg:0;--border-radius-md:6px}
+html,body{margin:0;padding:0;font-family:'Source Sans 3',sans-serif;background:#fff;height:100%;overflow:hidden;display:flex;flex-direction:column}
+#canvas-wrap{position:relative;width:100%;flex:1;overflow:hidden;background:var(--color-background-secondary);cursor:grab}
+#canvas-wrap:active{cursor:grabbing}
+#info-panel{display:flex;gap:8px;padding:8px 12px;flex-wrap:wrap}
+.info-card{flex:1;min-width:100px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:6px 10px;text-align:center}
+.info-n{font-size:14px;font-weight:500;color:var(--color-text-primary)}
+.info-l{font-size:10px;color:var(--color-text-secondary);margin-top:1px}
+.ctrls{display:flex;gap:8px;align-items:center;padding:4px 12px;flex-wrap:wrap}
+.ctrls button{font-family:inherit;font-size:12px;padding:4px 10px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer}
+.ctrls label{font-size:11px;color:var(--color-text-secondary)}
+#narration{display:none}
+</style>
+<div id="canvas-wrap"><canvas id="c3d"></canvas></div>
+<div class="ctrls">
+<button id="play-btn" onclick="toggleAnim()">Play SGD trajectory</button>
+<button onclick="resetBall()">Reset</button>
+<label>Rotate: drag</label>
+<label>Zoom: scroll</label>
+</div>
+<div id="info-panel">
+<div class="info-card"><div class="info-n" id="i-phase">—</div><div class="info-l">Current phase</div></div>
+<div class="info-card"><div class="info-n" id="i-loss">—</div><div class="info-l">Loss</div></div>
+<div class="info-card"><div class="info-n" id="i-llc">—</div><div class="info-l">LLC (λ)</div></div>
+<div class="info-card"><div class="info-n" id="i-width">—</div><div class="info-l">Basin width</div></div>
+</div>
+<div style="margin-top:10px;font-size:13px;color:var(--color-text-secondary);line-height:1.7" id="narration"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const wrap = document.getElementById('canvas-wrap');
+const canvas = document.getElementById('c3d');
+const W = wrap.clientWidth, H = wrap.clientHeight || 420;
+canvas.width = W * 2; canvas.height = H * 2;
+canvas.style.width = '100%'; canvas.style.height = '100%';
+
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+renderer.setSize(W, H);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+const dark = matchMedia('(prefers-color-scheme:dark)').matches;
+renderer.setClearColor(dark ? 0x2c2c2a : 0xf1efe8, 1);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, W/H, 0.1, 100);
+camera.position.set(6, 5, 8);
+camera.lookAt(0, 0, 0);
+
+const ambLight = new THREE.AmbientLight(0xffffff, 0.5);
+scene.add(ambLight);
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+dirLight.position.set(5, 8, 5);
+scene.add(dirLight);
+
+const basins = [
+  {cx:-2.2, cz:0, loss:0.28, width:1.8, llc:1.5, color:0xD85A30, name:'4⁻⁻ gon', label:'Wide + shallow'},
+  {cx:-0.2, cz:-1.2, loss:0.17, width:1.3, llc:3.0, color:0xBA7517, name:'4⁻ gon', label:'Medium'},
+  {cx:1.2, cz:0.5, loss:0.11, width:1.0, llc:5.0, color:0xEF9F27, name:'4 gon', label:'Getting narrower'},
+  {cx:3.0, cz:-0.5, loss:0.069, width:0.7, llc:7.0, color:0x378ADD, name:'5 gon', label:'Narrow + deep'},
+  {cx:4.5, cz:0.8, loss:0.048, width:0.45, llc:8.5, color:0x1D9E75, name:'6 gon', label:'Narrowest + deepest'},
+];
+
+const lossScale = 8;
+const gridSize = 12;
+const res = 120;
+
+function lossAt(x, z) {
+  let base = 0.35;
+  for (const b of basins) {
+    const dx = x - b.cx, dz = z - b.cz;
+    const r2 = dx*dx + dz*dz;
+    const sigma2 = b.width * b.width * 0.25;
+    const depth = (base - b.loss) * 1.2;
+    base -= depth * Math.exp(-r2 / (2*sigma2));
+  }
+  return base;
+}
+
+const geom = new THREE.PlaneGeometry(gridSize, gridSize, res, res);
+geom.rotateX(-Math.PI/2);
+const pos = geom.attributes.position;
+const colors = new Float32Array(pos.count * 3);
+
+for (let i = 0; i < pos.count; i++) {
+  const x = pos.getX(i), z = pos.getZ(i);
+  const y = lossAt(x, z) * lossScale;
+  pos.setY(i, -y);
+
+  const norm = Math.max(0, Math.min(1, (0.35 - lossAt(x,z)) / 0.32));
+  const r = 0.85 - norm * 0.4;
+  const g = 0.82 - norm * 0.25;
+  const b2 = 0.78 + norm * 0.15;
+  colors[i*3] = r; colors[i*3+1] = g; colors[i*3+2] = b2;
+}
+geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+geom.computeVertexNormals();
+
+const mat = new THREE.MeshPhongMaterial({
+  vertexColors: true,
+  side: THREE.DoubleSide,
+  shininess: 30,
+  transparent: true,
+  opacity: 0.88,
+  flatShading: false
+});
+const surface = new THREE.Mesh(geom, mat);
+scene.add(surface);
+
+const wireGeo = new THREE.PlaneGeometry(gridSize, gridSize, 30, 30);
+wireGeo.rotateX(-Math.PI/2);
+const wPos = wireGeo.attributes.position;
+for (let i = 0; i < wPos.count; i++) {
+  const x = wPos.getX(i), z = wPos.getZ(i);
+  wPos.setY(i, -lossAt(x, z) * lossScale + 0.01);
+}
+wireGeo.computeVertexNormals();
+const wireMat = new THREE.MeshBasicMaterial({color: dark?0x555550:0xaaaaaa, wireframe:true, transparent:true, opacity:0.15});
+scene.add(new THREE.Mesh(wireGeo, wireMat));
+
+const markers = [];
+for (const b of basins) {
+  const mGeo = new THREE.SphereGeometry(0.08, 12, 12);
+  const mMat = new THREE.MeshPhongMaterial({color: b.color, emissive: b.color, emissiveIntensity:0.3});
+  const marker = new THREE.Mesh(mGeo, mMat);
+  marker.position.set(b.cx, -b.loss * lossScale - 0.05, b.cz);
+  scene.add(marker);
+  markers.push(marker);
+
+  const ringGeo = new THREE.RingGeometry(b.width*0.45, b.width*0.5, 32);
+  ringGeo.rotateX(-Math.PI/2);
+  const ringMat = new THREE.MeshBasicMaterial({color: b.color, transparent:true, opacity:0.35, side:THREE.DoubleSide});
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.position.set(b.cx, -b.loss * lossScale + 0.02, b.cz);
+  scene.add(ring);
+}
+
+const ballGeo = new THREE.SphereGeometry(0.12, 16, 16);
+const ballMat = new THREE.MeshPhongMaterial({color:0xE24B4A, emissive:0xE24B4A, emissiveIntensity:0.4});
+const ball = new THREE.Mesh(ballGeo, ballMat);
+scene.add(ball);
+
+const trailPoints = [];
+let trailLine = null;
+
+const path = [];
+const stops = [
+  {bi:0, dur:80},
+  {bi:0, dur:40, moveTo:1},
+  {bi:1, dur:60},
+  {bi:1, dur:30, moveTo:2},
+  {bi:2, dur:80},
+  {bi:2, dur:40, moveTo:3},
+  {bi:3, dur:100},
+  {bi:3, dur:50, moveTo:4},
+  {bi:4, dur:120},
+];
+
+let totalFrames = 0;
+for (const s of stops) totalFrames += s.dur;
+
+function getBallPos(frame) {
+  let f = frame % totalFrames;
+  let accum = 0;
+  for (const s of stops) {
+    if (f < accum + s.dur) {
+      const t = (f - accum) / s.dur;
+      if (s.moveTo !== undefined) {
+        const from = basins[s.bi];
+        const to = basins[s.moveTo];
+        const x = from.cx + (to.cx-from.cx)*t;
+        const z = from.cz + (to.cz-from.cz)*t;
+        const y = lossAt(x, z);
+        return {x, y:-y*lossScale-0.12, z, bi: t<0.5?s.bi:s.moveTo, transitioning:true};
+      } else {
+        const b = basins[s.bi];
+        const wobble = Math.sin(t*Math.PI*4)*b.width*0.15;
+        const x = b.cx + wobble;
+        const z = b.cz + Math.cos(t*Math.PI*3)*b.width*0.1;
+        const y = lossAt(x, z);
+        return {x, y:-y*lossScale-0.12, z, bi:s.bi, transitioning:false};
+      }
+    }
+    accum += s.dur;
+  }
+  return {x:0,y:0,z:0,bi:0,transitioning:false};
+}
+
+let frame = 0;
+let playing = false;
+
+function toggleAnim() {
+  playing = !playing;
+  document.getElementById('play-btn').textContent = playing ? 'Pause' : 'Play SGD trajectory';
+}
+
+function resetBall() {
+  frame = 0;
+  playing = false;
+  trailPoints.length = 0;
+  if (trailLine) { scene.remove(trailLine); trailLine = null; }
+  document.getElementById('play-btn').textContent = 'Play SGD trajectory';
+  updateInfo(getBallPos(0));
+}
+
+function updateInfo(p) {
+  const b = basins[p.bi];
+  document.getElementById('i-phase').textContent = b.name;
+  document.getElementById('i-phase').style.color = '#'+b.color.toString(16).padStart(6,'0');
+  document.getElementById('i-loss').textContent = b.loss.toFixed(3);
+  document.getElementById('i-llc').textContent = b.llc.toFixed(1);
+  document.getElementById('i-width').textContent = b.label;
+
+  const narrations = {
+    0: 'The ball starts in the widest basin — the most degenerate 4-gon variants. Low LLC means a broad, flat valley. Easy to fall into, but high loss. Many parameter settings give similar (bad) performance.',
+    1: 'Transitioning to a less degenerate 4-gon. The basin is narrower (higher LLC) but the loss is lower. The network is starting to pin down more parameters.',
+    2: 'The standard 4-gon. Four features reconstructed perfectly, two ignored. The basin is moderately narrow — the parameters are fairly constrained now.',
+    3: 'The 5-gon! A qualitative shift — the network now represents 5 features using superposition. The basin is noticeably narrower (λ=7). Less room to wiggle, but significantly better loss.',
+    4: 'The 6-gon — the narrowest and deepest basin. Every parameter is pinned to a precise value (λ=8.5). The network represents all 6 features in just 2 dimensions. Lowest loss, highest complexity.'
+  };
+  document.getElementById('narration').textContent = p.transitioning ? 'The ball escapes the current basin and rolls toward a deeper, narrower one...' : (narrations[p.bi] || '');
+}
+
+let isDragging = false, prevMouse = {x:0,y:0};
+let camTheta = 0.7, camPhi = 0.6, camDist = 12;
+
+wrap.addEventListener('mousedown', e => { isDragging=true; prevMouse={x:e.clientX,y:e.clientY}; });
+wrap.addEventListener('touchstart', e => { isDragging=true; prevMouse={x:e.touches[0].clientX,y:e.touches[0].clientY}; }, {passive:true});
+
+window.addEventListener('mousemove', e => {
+  if(!isDragging) return;
+  camTheta -= (e.clientX-prevMouse.x)*0.008;
+  camPhi = Math.max(0.15, Math.min(1.4, camPhi-(e.clientY-prevMouse.y)*0.008));
+  prevMouse = {x:e.clientX, y:e.clientY};
+});
+window.addEventListener('touchmove', e => {
+  if(!isDragging) return;
+  camTheta -= (e.touches[0].clientX-prevMouse.x)*0.008;
+  camPhi = Math.max(0.15, Math.min(1.4, camPhi-(e.touches[0].clientY-prevMouse.y)*0.008));
+  prevMouse = {x:e.touches[0].clientX, y:e.touches[0].clientY};
+}, {passive:true});
+
+window.addEventListener('mouseup', () => isDragging=false);
+window.addEventListener('touchend', () => isDragging=false);
+
+wrap.addEventListener('wheel', e => {
+  e.preventDefault();
+  camDist = Math.max(5, Math.min(20, camDist + e.deltaY*0.01));
+}, {passive:false});
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  camera.position.set(
+    camDist*Math.sin(camTheta)*Math.cos(camPhi) + 1,
+    camDist*Math.sin(camPhi),
+    camDist*Math.cos(camTheta)*Math.cos(camPhi)
+  );
+  camera.lookAt(1, -1.2, 0);
+
+  if(playing) {
+    frame++;
+    if (frame >= totalFrames) { frame = totalFrames - 1; playing = false; document.getElementById('play-btn').textContent = 'Play SGD trajectory'; }
+  }
+
+  const p = getBallPos(frame);
+  ball.position.set(p.x, p.y, p.z);
+  updateInfo(p);
+
+  if (playing) {
+    trailPoints.push(new THREE.Vector3(p.x, p.y + 0.02, p.z));
+    if (trailPoints.length > 2) {
+      if (trailLine) scene.remove(trailLine);
+      const tGeo = new THREE.BufferGeometry().setFromPoints(trailPoints);
+      const tMat = new THREE.LineBasicMaterial({color:0xE24B4A, transparent:true, opacity:0.5});
+      trailLine = new THREE.Line(tGeo, tMat);
+      scene.add(trailLine);
+    }
+  }
+
+  renderer.render(scene, camera);
+}
+
+resetBall();
+animate();
+</script>

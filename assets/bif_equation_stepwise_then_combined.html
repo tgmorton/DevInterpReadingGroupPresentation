@@ -1,0 +1,306 @@
+<style>
+:root {
+  --bg: #ffffff;
+  --bg-soft: #f6f6f4;
+  --text: #1a1a1a;
+  --text-2: #5a5a5a;
+  --text-3: #8a8a8a;
+  --border: #e0e0e0;
+  --font-sans: 'Source Sans 3', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+}
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: var(--font-sans);
+  color: var(--text);
+  background: var(--bg);
+}
+.w {
+  padding: 12px 16px;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  gap: 18px;
+  align-items: stretch;
+}
+.left {
+  flex: 0 0 52%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+}
+canvas {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: 1 / 1;
+  background: #ffffff;
+  border-radius: 6px;
+  display: block;
+  border: 1px solid var(--border);
+}
+.right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.sr {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.sr label { min-width: 50px; font-weight: 500; }
+.sr span {
+  font-weight: 500;
+  font-family: var(--font-mono);
+  min-width: 60px;
+  text-align: right;
+}
+.phase {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  text-align: center;
+  padding: 2px 0;
+}
+.ctrls {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+.ctrls button {
+  font-size: 12px;
+  padding: 4px 14px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: #fafafa;
+  color: var(--text);
+  cursor: pointer;
+  font-family: var(--font-sans);
+}
+.ctrls button:hover { background: #f0f0f0; }
+.eqbox {
+  background: var(--bg-soft);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.7;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+.step { margin: 0 0 6px; padding: 0 0 6px; border-bottom: 0.5px solid var(--border); }
+.step:last-child { border-bottom: none; margin: 0; padding: 0; }
+.slabel { font-size: 10px; color: var(--text-2); font-family: var(--font-sans); margin: 0 0 2px; font-weight: 500; }
+.v { font-weight: 500; padding: 1px 5px; border-radius: 3px; font-size: 13px; }
+.tl { color: #085041; background: #E1F5EE; }
+.cr { color: #712B13; background: #FAECE7; }
+.pr { color: #3C3489; background: #EEEDFE; }
+.gr { color: #444441; background: #F1EFE8; }
+.am { color: #633806; background: #FAEEDA; }
+.op { color: var(--text-3); }
+.final { font-size: 14px; font-weight: 500; }
+.note {
+  font-size: 11px;
+  color: var(--text-2);
+  text-align: center;
+  min-height: 28px;
+  line-height: 1.5;
+}
+</style>
+<div class="w">
+  <div class="left">
+    <canvas id="cv"></canvas>
+  </div>
+  <div class="right">
+    <div class="sr">
+      <label>Epoch</label>
+      <input type="range" min="0" max="1000" value="180" step="1" id="epoch" style="flex:1" oninput="upd()">
+      <span id="oEp">2,160</span>
+    </div>
+    <div class="phase" id="phase"></div>
+    <div class="ctrls">
+      <button onclick="play()">Play</button>
+      <button onclick="stop()">Pause</button>
+      <button onclick="document.getElementById('epoch').value=0;upd()">Reset</button>
+    </div>
+    <div class="eqbox" id="eq"></div>
+    <div class="note" id="note"></div>
+  </div>
+</div>
+<script>
+const NSAMP=300,NOISE=0.022;
+let _s=42;
+function rn(){_s=(_s*1664525+1013904223)&0x7FFFFFFF;return _s/0x7FFFFFFF;}
+function rg(){let u=0,v=0;while(!u)u=rn();while(!v)v=rn();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+const K=[
+  {t:0,uD:0.35,uC:0.35,vD:0.35,vC:0.35,piU:1.0,lab:'Before training',note:'One basin. All terms near zero.'},
+  {t:80,uD:0.34,uC:0.34,vD:0.34,vC:0.34,piU:1.0,lab:'Mode 1: all living',note:'Still one basin.'},
+  {t:180,uD:0.30,uC:0.30,vD:0.18,vC:0.18,piU:0.5,lab:'Transition: animal vs plant',note:'\u03C0U\u00B7\u03C0V is large. Both \u0394s positive. Product positive. Between-phase positive. BIF negative.'},
+  {t:280,uD:0.18,uC:0.18,vD:0.18,vC:0.18,piU:1.0,lab:'Consolidated: animal learned',note:'\u03C0U\u00B7\u03C0V = 0 kills the between-phase entirely. Within-phase is tiny. BIF \u2248 0.'},
+  {t:400,uD:0.17,uC:0.17,vD:0.10,vC:0.10,piU:0.5,lab:'Transition: mammal vs bird',note:'Both \u0394s positive again. Same pattern as before.'},
+  {t:500,uD:0.10,uC:0.10,vD:0.10,vC:0.10,piU:1.0,lab:'Consolidated: mammal learned',note:'\u03C0U\u00B7\u03C0V = 0 again. BIF \u2248 0.'},
+  {t:620,uD:0.09,uC:0.09,vD:0.09,vC:0.09,piU:1.0,lab:'Before final distinction',note:'Quiet.'},
+  {t:720,uD:0.08,uC:0.08,vD:0.03,vC:0.20,piU:0.5,lab:'Transition: dog vs cat',note:'\u0394dog positive, \u0394cat NEGATIVE. Product flips. BIF is now POSITIVE.'},
+  {t:830,uD:0.06,uC:0.10,vD:0.02,vC:0.18,piU:0.3,lab:'Transition resolving',note:'\u03C0U shrinking, between-phase fading.'},
+  {t:920,uD:0.03,uC:0.07,vD:0.03,vC:0.07,piU:1.0,lab:'Fully differentiated',note:'One basin. All zero.'},
+  {t:1000,uD:0.02,uC:0.04,vD:0.02,vC:0.04,piU:1.0,lab:'Converged',note:'Done.'},
+];
+function lerp(a,b,f){return a+(b-a)*f;}
+function getState(t){
+  if(t<=K[0].t)return K[0];if(t>=K[K.length-1].t)return K[K.length-1];
+  for(let i=0;i<K.length-1;i++){if(t>=K[i].t&&t<=K[i+1].t){const f=(t-K[i].t)/(K[i+1].t-K[i].t),sf=f*f*(3-2*f),a=K[i],b=K[i+1];return{uD:lerp(a.uD,b.uD,sf),uC:lerp(a.uC,b.uC,sf),vD:lerp(a.vD,b.vD,sf),vC:lerp(a.vC,b.vC,sf),piU:lerp(a.piU,b.piU,sf),lab:sf<0.5?a.lab:b.lab,note:sf<0.5?a.note:b.note};}}
+}
+let animId=null;
+function play(){if(animId)return;function loop(){const sl=document.getElementById('epoch');let v=parseInt(sl.value)+2;if(v>1000){v=1000;stop();}sl.value=v;upd();animId=requestAnimationFrame(loop);}animId=requestAnimationFrame(loop);}
+function stop(){if(animId){cancelAnimationFrame(animId);animId=null;}}
+function f4(v){return v.toFixed(4);}
+function f3(v){return v.toFixed(3);}
+function fs(v){return(v>=0?'+':'\u2212')+Math.abs(v).toFixed(3);}
+function fs4(v){return(v>=0?'+':'\u2212')+Math.abs(v).toFixed(4);}
+
+function upd(){
+  const t=parseInt(document.getElementById('epoch').value);
+  document.getElementById('oEp').textContent=Math.round(t/1000*12000).toLocaleString();
+  const s=getState(t);
+  document.getElementById('phase').textContent=s.lab;
+  document.getElementById('note').textContent=s.note;
+  _s=42;
+  const pts=[];
+  for(let i=0;i<NSAMP;i++){const inU=rn()<s.piU;pts.push({d:(inU?s.uD:s.vD)+rg()*NOISE,c:(inU?s.uC:s.vC)+rg()*NOISE,phase:inU?0:1});}
+  const nU=pts.filter(p=>p.phase===0).length,nV=NSAMP-nU;
+  const piU=nU/NSAMP,piV=nV/NSAMP;
+  let mdU=0,mcU=0,mdV=0,mcV=0;
+  pts.forEach(p=>{if(p.phase===0){mdU+=p.d;mcU+=p.c;}else{mdV+=p.d;mcV+=p.c;}});
+  if(nU>0){mdU/=nU;mcU/=nU;}if(nV>0){mdV/=nV;mcV/=nV;}
+  let covU=0,covV=0;
+  pts.forEach(p=>{if(p.phase===0)covU+=(p.d-mdU)*(p.c-mcU);else covV+=(p.d-mdV)*(p.c-mcV);});
+  if(nU>1)covU/=(nU-1);if(nV>1)covV/=(nV-1);
+  const dD=mdU-mdV,dC=mcU-mcV;
+  const within=piU*covU+piV*covV;
+  const between=piU*piV*dD*dC;
+  const total=within+between;
+  const bif=-total;
+
+  let h='';
+
+  h+='<div class="step">';
+  h+='<div class="slabel">1. How split is the posterior?</div>';
+  h+='\u03C0<sub>U</sub> = <span class="v gr">'+f3(piU)+'</span> &nbsp; \u03C0<sub>V</sub> = <span class="v gr">'+f3(piV)+'</span> &nbsp; \u03C0<sub>U</sub>\u00B7\u03C0<sub>V</sub> = <span class="v gr">'+f3(piU*piV)+'</span>';
+  h+='</div>';
+
+  h+='<div class="step">';
+  h+='<div class="slabel">2. Within each basin, do losses co-vary?</div>';
+  h+='Cov<sub>U</sub> = <span class="v tl">'+f4(covU)+'</span> &nbsp; Cov<sub>V</sub> = <span class="v tl">'+f4(nV>1?covV:0)+'</span><br>';
+  h+='Within = <span class="v gr">'+f3(piU)+'</span> <span class="op">\u00B7</span> <span class="v tl">'+f4(covU)+'</span> <span class="op">+</span> <span class="v gr">'+f3(piV)+'</span> <span class="op">\u00B7</span> <span class="v tl">'+f4(nV>1?covV:0)+'</span> <span class="op">=</span> <span class="v tl">'+fs4(within)+'</span>';
+  h+='</div>';
+
+  h+='<div class="step">';
+  h+='<div class="slabel">3. Across basins, how do the mean losses shift?</div>';
+  h+='\u0394dog = <span class="v am">'+fs(dD)+'</span> &nbsp; \u0394cat = <span class="v am">'+fs(dC)+'</span> &nbsp; product = <span class="v am">'+fs4(dD*dC)+'</span><br>';
+  h+='Between = <span class="v gr">'+f3(piU*piV)+'</span> <span class="op">\u00B7</span> <span class="v am">'+fs4(dD*dC)+'</span> <span class="op">=</span> <span class="v cr">'+fs4(between)+'</span>';
+  h+='</div>';
+
+  h+='<div class="step">';
+  h+='<div class="slabel">4. Combine</div>';
+  h+='Cov(\u2113<sub>dog</sub>, \u2113<sub>cat</sub>) = <span class="v tl">'+fs4(within)+'</span> <span class="op">+</span> <span class="v cr">'+fs4(between)+'</span> <span class="op">=</span> <span class="v gr">'+fs4(total)+'</span>';
+  h+='</div>';
+
+  h+='<div class="step">';
+  h+='<div class="slabel">5. Negate</div>';
+  h+='<span class="final">BIF(dog, cat) = \u2212(<span class="v gr">'+fs4(total)+'</span>) = <span class="v pr">'+fs4(bif)+'</span></span>';
+  h+='</div>';
+
+  document.getElementById('eq').innerHTML=h;
+
+  // === Canvas drawing ===
+  const cv=document.getElementById('cv');
+  const dpr=window.devicePixelRatio||1;
+  const rect=cv.getBoundingClientRect();
+  const w=rect.width,hh=rect.height;
+  cv.width=w*dpr;cv.height=hh*dpr;
+  const c=cv.getContext('2d');
+  c.setTransform(dpr,0,0,dpr,0,0);
+
+  // White background
+  c.fillStyle='#ffffff';c.fillRect(0,0,w,hh);
+
+  // Plot area
+  const pad={l:54,r:18,t:18,b:42},pw=w-pad.l-pad.r,ph=hh-pad.t-pad.b;
+  const axMin=-0.02,axMax=0.45;
+  function tx(v){return pad.l+((v-axMin)/(axMax-axMin))*pw;}
+  function ty(v){return pad.t+ph-((v-axMin)/(axMax-axMin))*ph;}
+
+  // Subtle gridlines
+  const gridVals=[0,0.1,0.2,0.3,0.4];
+  c.strokeStyle='#ececec';c.lineWidth=1;
+  gridVals.forEach(g=>{
+    c.beginPath();c.moveTo(tx(g),pad.t);c.lineTo(tx(g),pad.t+ph);c.stroke();
+    c.beginPath();c.moveTo(pad.l,ty(g));c.lineTo(pad.l+pw,ty(g));c.stroke();
+  });
+
+  // Axes
+  c.strokeStyle='#8a8a8a';c.lineWidth=1;
+  c.beginPath();
+  c.moveTo(pad.l,pad.t);c.lineTo(pad.l,pad.t+ph);c.lineTo(pad.l+pw,pad.t+ph);
+  c.stroke();
+
+  // Tick labels
+  c.fillStyle='#8a8a8a';c.font='10px sans-serif';
+  c.textAlign='center';
+  gridVals.forEach(g=>{c.fillText(g.toFixed(1),tx(g),pad.t+ph+14);});
+  c.textAlign='right';
+  gridVals.forEach(g=>{c.fillText(g.toFixed(1),pad.l-6,ty(g)+3);});
+
+  // Diagonal y = x reference line
+  c.strokeStyle='#cfcfcf';c.lineWidth=0.7;
+  c.setLineDash([3,3]);
+  c.beginPath();c.moveTo(tx(0),ty(0));c.lineTo(tx(axMax),ty(axMax));c.stroke();
+  c.setLineDash([]);
+
+  // Axis labels
+  c.fillStyle='#3a3a3a';c.font='600 13px sans-serif';
+  c.textAlign='center';
+  c.fillText('dog loss',pad.l+pw/2,hh-8);
+  c.save();
+  c.translate(15,pad.t+ph/2);
+  c.rotate(-Math.PI/2);
+  c.textAlign='center';
+  c.fillText('cat loss',0,0);
+  c.restore();
+
+  // Sample points (clipped to plot area so axis-overflowing points don't appear)
+  pts.forEach(p=>{
+    if(p.d<axMin||p.d>axMax||p.c<axMin||p.c>axMax)return;
+    c.fillStyle=p.phase===0?'rgba(29,158,117,0.35)':'rgba(216,90,48,0.35)';
+    c.beginPath();c.arc(tx(p.d),ty(p.c),3,0,Math.PI*2);c.fill();
+  });
+
+  // Phase centroids U / V
+  if(nU>0&&nV>0&&s.piU>0.02&&s.piU<0.98){
+    c.setLineDash([5,4]);c.strokeStyle='#534AB7';c.lineWidth=2;
+    c.beginPath();c.moveTo(tx(mdU),ty(mcU));c.lineTo(tx(mdV),ty(mcV));c.stroke();
+    c.setLineDash([]);
+    c.strokeStyle='#ffffff';c.lineWidth=2;
+    c.fillStyle='#085041';c.beginPath();c.arc(tx(mdU),ty(mcU),8,0,Math.PI*2);c.fill();c.stroke();
+    c.fillStyle='#712B13';c.beginPath();c.arc(tx(mdV),ty(mcV),8,0,Math.PI*2);c.fill();c.stroke();
+    c.fillStyle='#ffffff';c.font='600 10px sans-serif';c.textAlign='center';
+    c.fillText('U',tx(mdU),ty(mcU)+3);c.fillText('V',tx(mdV),ty(mcV)+3);
+  }
+}
+upd();
+window.addEventListener('resize',upd);
+</script>

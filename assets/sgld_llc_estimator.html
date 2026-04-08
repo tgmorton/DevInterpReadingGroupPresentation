@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;font-family:'Source Sans 3',sans-serif;background:#fff;color:#3a3a3a}
+#app{display:flex;flex-direction:column;width:100%;height:100%;padding:10px 16px 8px}
+.formula-bar{background:#f6f6f4;border-radius:6px;padding:5px 12px;margin:0 0 6px;font-size:12px;color:#7a7a7a;text-align:center;line-height:1.6}
+.formula-bar strong{color:#1a1a1a}
+.pset{display:flex;gap:4px;margin:0 0 4px}
+.pset button{font-size:12px;padding:4px 10px;border-radius:4px;cursor:pointer;border:1px solid #ddd;background:#fff;color:#7a7a7a;font-family:inherit}
+.pset button.a{background:#2d5a7b;color:#fff;border-color:#2d5a7b}
+.main-row{display:flex;gap:8px;flex:1;min-height:0;overflow:hidden}
+.panel{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden}
+.panel-label{font-size:12px;font-weight:600;color:#1a1a1a;margin:0 0 3px;flex-shrink:0}
+.panel canvas{flex:1;width:100%;min-height:0;border-radius:6px;background:#f6f6f4;display:block}
+.ctrls{display:flex;gap:10px;margin:4px 0;flex-wrap:wrap}
+.ctrl{display:flex;align-items:center;gap:5px;font-size:12px;color:#7a7a7a;flex:1;min-width:120px}
+.ctrl input{flex:1;min-width:50px}
+.ctrl span{min-width:30px;text-align:right;font-family:monospace;font-size:11px;color:#1a1a1a}
+.btn-row{display:flex;gap:6px;margin:0 0 4px}
+.btn-row button{font-size:12px;padding:4px 12px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-family:inherit}
+.readouts{display:flex;gap:6px;margin:2px 0}
+.ro{flex:1;padding:5px 8px;border-radius:6px;background:#f6f6f4}
+.ro-label{font-size:10px;color:#7a7a7a}
+.ro-val{font-size:14px;font-weight:500;font-family:monospace;color:#1a1a1a}
+.ro-sub{font-size:10px;color:#7a7a7a;margin:1px 0 0}
+.ro.hl{border-left:3px solid #8b6eae;border-radius:0}
+.ro.hl .ro-val{color:#8b6eae}
+.note{font-size:12px;color:#7a7a7a;line-height:1.4;margin:4px 0 0}
+</style>
+</head>
+<body>
+<div id="app">
+<div class="formula-bar">
+  <strong>SGLD:</strong> Δw = (ε/2)[nβ·∇ℓ + (γ/2)(w−w*)] + N(0,ε) |
+  <strong>LLC:</strong> λ̂ = nβ·[mean(ℓ) − ℓ(w*)]
+</div>
+<div class="pset" id="presets"></div>
+<div class="main-row">
+  <div class="panel">
+    <div class="panel-label">SGLD chains exploring landscape</div>
+    <canvas id="cv1"></canvas>
+  </div>
+  <div class="panel">
+    <div class="panel-label">Running LLC estimate</div>
+    <canvas id="cv2"></canvas>
+  </div>
+</div>
+<div class="ctrls">
+  <div class="ctrl"><span style="min-width:8px">γ</span><input type="range" id="gamma" min="5" max="200" value="60" step="5" oninput="reset()"><span id="gamma-v">60</span></div>
+  <div class="ctrl"><span style="min-width:14px">nβ</span><input type="range" id="nb" min="5" max="100" value="30" step="5" oninput="reset()"><span id="nb-v">30</span></div>
+  <div class="ctrl"><span style="min-width:8px">ε</span><input type="range" id="lr" min="1" max="30" value="8" step="1" oninput="reset()"><span id="lr-v">0.008</span></div>
+</div>
+<div class="btn-row">
+  <button onclick="reset()">Reset</button>
+  <button onclick="toggleRun()" id="run-btn">Pause</button>
+</div>
+<div class="readouts">
+  <div class="ro"><div class="ro-label">ℓ(w*)</div><div class="ro-val" id="ro-lstar">0.000</div></div>
+  <div class="ro"><div class="ro-label">mean ℓ(samples)</div><div class="ro-val" id="ro-lmean">—</div></div>
+  <div class="ro hl"><div class="ro-label">λ̂ estimate</div><div class="ro-val" id="ro-llc">—</div><div class="ro-sub" id="ro-true">true λ = 1.0</div></div>
+  <div class="ro"><div class="ro-label">Steps</div><div class="ro-val" id="ro-steps">0</div><div class="ro-sub">8 chains</div></div>
+</div>
+<div class="note" id="note">Select a landscape. Watch the SGLD walkers — in degenerate landscapes they spread further at low loss, producing a lower LLC estimate.</div>
+</div>
+
+<script>
+const txt='#3a3a3a',txt2='#7a7a7a',gridC='rgba(0,0,0,0.06)';
+const chainColors=['#c4933f','#5a8a5e','#2d5a7b','#c45a3c','#D4537E','#8b6eae','#639922','#a8a8a8'];
+const nChains=8;
+
+const cases=[
+  {name:'x² + y²',fn:(x,y)=>x*x+y*y,gx:(x,y)=>2*x,gy:(x,y)=>2*y,llc:1.0},
+  {name:'x⁴ + y⁴',fn:(x,y)=>x**4+y**4,gx:(x,y)=>4*x**3,gy:(x,y)=>4*y**3,llc:0.5},
+  {name:'x² + y⁴',fn:(x,y)=>x*x+y**4,gx:(x,y)=>2*x,gy:(x,y)=>4*y**3,llc:0.75},
+  {name:'x²y⁴',fn:(x,y)=>x*x*y**4,gx:(x,y)=>2*x*y**4,gy:(x,y)=>4*x*x*y**3,llc:0.25},
+];
+
+let cur=0,running=true,chains=[],llcHistory=[],step=0,cumLoss=0,totalSamples=0;
+
+function buildUI(){document.getElementById('presets').innerHTML=cases.map((c,i)=>`<button class="${i===cur?'a':''}" onclick="selCase(${i})">${c.name} <span style="font-size:10px">(λ=${c.llc})</span></button>`).join('');}
+function selCase(i){cur=i;buildUI();reset();}
+
+function reset(){
+  document.getElementById('gamma-v').textContent=document.getElementById('gamma').value;
+  document.getElementById('nb-v').textContent=document.getElementById('nb').value;
+  document.getElementById('lr-v').textContent=(+document.getElementById('lr').value/1000).toFixed(3);
+  chains=[];for(let i=0;i<nChains;i++)chains.push({x:0,y:0,trail:[]});
+  llcHistory=[];step=0;cumLoss=0;totalSamples=0;running=true;
+  document.getElementById('run-btn').textContent='Pause';
+  document.getElementById('ro-lmean').textContent='—';
+  document.getElementById('ro-llc').textContent='—';
+  document.getElementById('ro-steps').textContent='0';
+  document.getElementById('ro-true').textContent='true λ = '+cases[cur].llc;
+}
+function toggleRun(){running=!running;document.getElementById('run-btn').textContent=running?'Pause':'Resume';}
+
+function sgldStep(){
+  const c=cases[cur],eps=+document.getElementById('lr').value/1000;
+  const gamma=+document.getElementById('gamma').value,nb=+document.getElementById('nb').value;
+  step++;
+  chains.forEach(ch=>{
+    const nx=(Math.random()-0.5)*2*Math.sqrt(eps)*1.4,ny=(Math.random()-0.5)*2*Math.sqrt(eps)*1.4;
+    ch.x-=(eps/2)*(nb*c.gx(ch.x,ch.y)+gamma/2*ch.x)-nx;
+    ch.y-=(eps/2)*(nb*c.gy(ch.x,ch.y)+gamma/2*ch.y)-ny;
+    ch.trail.push({x:ch.x,y:ch.y});if(ch.trail.length>120)ch.trail.shift();
+    cumLoss+=c.fn(ch.x,ch.y);totalSamples++;
+  });
+  llcHistory.push(+document.getElementById('nb').value*(cumLoss/totalSamples));
+}
+
+function sc(id){
+  const cv=document.getElementById(id),dpr=window.devicePixelRatio||1;
+  const rect=cv.getBoundingClientRect();
+  const w=Math.floor(rect.width),h=Math.floor(rect.height);
+  if(w<10||h<10) return{ctx:cv.getContext('2d'),w:300,h:200};
+  cv.width=w*dpr;cv.height=h*dpr;
+  const ctx=cv.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
+  return{ctx,w,h};
+}
+
+function render(){
+  const c=cases[cur],range=c.name==='x²y⁴'?1.0:0.8;
+
+  // Landscape
+  const{ctx:c1,w:w1,h:h1}=sc('cv1');
+  const m=8,pw=w1-2*m,ph=h1-2*m,res=3;
+  for(let px=0;px<pw;px+=res){for(let py=0;py<ph;py+=res){
+    const x=(px/pw-0.5)*2*range,y=(py/ph-0.5)*2*range;
+    const t=Math.min(c.fn(x,y)/0.5,1);const g=Math.round(242-65*t);
+    c1.fillStyle=`rgb(${g},${g},${g})`;c1.fillRect(m+px,m+py,res,res);
+  }}
+
+  // Contours
+  [0.01,0.03,0.08,0.15,0.3].forEach(lev=>{
+    for(let px=0;px<pw-res;px+=res){for(let py=0;py<ph-res;py+=res){
+      const x=(px/pw-0.5)*2*range,y=(py/ph-0.5)*2*range,v=c.fn(x,y);
+      const vr=c.fn(((px+res)/pw-0.5)*2*range,y),vd=c.fn(x,((py+res)/ph-0.5)*2*range);
+      if((v-lev)*(vr-lev)<0||(v-lev)*(vd-lev)<0){c1.fillStyle='rgba(0,0,0,0.08)';c1.fillRect(m+px,m+py,1,1);}
+    }}
+  });
+
+  // Origin
+  const ox=m+pw/2,oy=m+ph/2;
+  c1.strokeStyle='rgba(0,0,0,0.3)';c1.lineWidth=1;
+  c1.beginPath();c1.moveTo(ox-4,oy);c1.lineTo(ox+4,oy);c1.stroke();
+  c1.beginPath();c1.moveTo(ox,oy-4);c1.lineTo(ox,oy+4);c1.stroke();
+
+  function tx(x){return m+(x/range*0.5+0.5)*pw;}
+  function ty(y){return m+(y/range*0.5+0.5)*ph;}
+
+  // Chains
+  chains.forEach((ch,ci)=>{
+    const col=chainColors[ci];
+    if(ch.trail.length>1){c1.beginPath();ch.trail.forEach((pt,i)=>{const sx=tx(pt.x),sy=ty(pt.y);i===0?c1.moveTo(sx,sy):c1.lineTo(sx,sy);});
+      c1.strokeStyle=col;c1.lineWidth=0.8;c1.globalAlpha=0.3;c1.stroke();c1.globalAlpha=1;}
+    c1.fillStyle=col;c1.beginPath();c1.arc(tx(ch.x),ty(ch.y),3,0,Math.PI*2);c1.fill();
+    c1.strokeStyle='rgba(255,255,255,0.7)';c1.lineWidth=0.8;c1.stroke();
+  });
+
+  // LLC chart
+  const{ctx:c2,w:w2,h:h2}=sc('cv2');
+  const p2={l:38,r:10,t:10,b:22},pw2=w2-p2.l-p2.r,ph2=h2-p2.t-p2.b;
+  c2.strokeStyle=gridC;c2.lineWidth=0.5;
+  c2.beginPath();c2.moveTo(p2.l,p2.t);c2.lineTo(p2.l,p2.t+ph2);c2.lineTo(p2.l+pw2,p2.t+ph2);c2.stroke();
+
+  if(llcHistory.length>1){
+    const maxS=Math.max(llcHistory.length,100);
+    let yMin=Infinity,yMax=-Infinity;
+    llcHistory.forEach(v=>{if(isFinite(v)){if(v<yMin)yMin=v;if(v>yMax)yMax=v;}});
+    yMin=Math.max(0,yMin-0.2);yMax=Math.max(yMax+0.2,c.llc+0.5);const yR=yMax-yMin||1;
+
+    for(let i=0;i<=3;i++){const yy=p2.t+i*ph2/3;
+      c2.beginPath();c2.moveTo(p2.l,yy);c2.lineTo(p2.l+pw2,yy);c2.strokeStyle=gridC;c2.stroke();
+      c2.fillStyle=txt2;c2.font="11px monospace";c2.textAlign='right';
+      c2.fillText((yMax-(yMax-yMin)*i/3).toFixed(1),p2.l-4,yy+4);}
+
+    c2.beginPath();llcHistory.forEach((v,i)=>{if(!isFinite(v))return;const x=p2.l+(i/maxS)*pw2,y=p2.t+ph2-((v-yMin)/yR)*ph2;i===0?c2.moveTo(x,y):c2.lineTo(x,y);});
+    c2.strokeStyle='#8b6eae';c2.lineWidth=2;c2.stroke();
+
+    const trueY=p2.t+ph2-((c.llc-yMin)/yR)*ph2;
+    c2.strokeStyle='#5a8a5e';c2.lineWidth=1.5;c2.setLineDash([5,5]);
+    c2.beginPath();c2.moveTo(p2.l,trueY);c2.lineTo(p2.l+pw2,trueY);c2.stroke();c2.setLineDash([]);
+    c2.fillStyle='#5a8a5e';c2.font="500 11px 'Source Sans 3'";c2.textAlign='left';
+    c2.fillText('true λ='+c.llc,p2.l+4,trueY-5);
+  }else{c2.fillStyle=txt2;c2.font="13px 'Source Sans 3'";c2.textAlign='center';c2.fillText('Waiting...',w2/2,h2/2);}
+
+  c2.fillStyle=txt2;c2.font="11px 'Source Sans 3'";c2.textAlign='center';c2.fillText('steps',p2.l+pw2/2,h2-4);
+
+  if(totalSamples>0){
+    const ml=cumLoss/totalSamples,nb=+document.getElementById('nb').value;
+    document.getElementById('ro-lmean').textContent=ml.toFixed(4);
+    document.getElementById('ro-llc').textContent=(nb*ml).toFixed(2);
+    document.getElementById('ro-steps').textContent=step;
+  }
+}
+
+let animId;
+function loop(){if(running&&step<600){for(let i=0;i<2;i++)sgldStep();render();}animId=requestAnimationFrame(loop);}
+buildUI();reset();requestAnimationFrame(()=>requestAnimationFrame(()=>{render();loop();}));
+window.addEventListener('resize',render);
+</script>
+</body></html>

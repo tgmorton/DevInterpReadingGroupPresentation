@@ -1,0 +1,292 @@
+
+<style>
+.ctrls{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 6px;align-items:center}
+.ctrl{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--color-text-secondary)}
+.ctrl input[type=range]{width:80px}
+.ctrl span{min-width:32px;text-align:right;font-family:var(--font-mono);font-size:11px;color:var(--color-text-primary)}
+.view-toggle{display:flex;gap:0;border-radius:var(--border-radius-md);overflow:hidden;border:0.5px solid var(--color-border-tertiary)}
+.vt{font-size:12px;padding:4px 14px;cursor:pointer;border:none;background:transparent;color:var(--color-text-secondary);transition:all .15s}
+.vt.a{background:var(--color-background-info);color:var(--color-text-info)}
+canvas{width:100%;height:360px;border-radius:var(--border-radius-lg);background:var(--color-background-secondary)}
+.note{font-size:12px;color:var(--color-text-secondary);line-height:1.6;padding:6px 10px;border-radius:var(--border-radius-md);background:var(--color-background-secondary);margin:4px 0 0}
+</style>
+
+<div class="ctrls">
+  <div class="view-toggle">
+    <button class="vt a" id="vt2d" onclick="setView('2d')">2D scatter</button>
+    <button class="vt" id="vt3d" onclick="setView('3d')">3D plane</button>
+  </div>
+  <div class="ctrl">t₁<input type="range" id="t1" min="-15" max="15" value="7" step="1" oninput="recompute()"><span id="t1v">0.7</span></div>
+  <div class="ctrl">t₂<input type="range" id="t2" min="-15" max="15" value="-4" step="1" oninput="recompute()"><span id="t2v">-0.4</span></div>
+  <div class="ctrl">noise<input type="range" id="noise" min="0" max="10" value="3" step="1" oninput="recompute()"><span id="nv">0.3</span></div>
+  <div class="ctrl">context<input type="range" id="qidx" min="0" max="7" value="7" step="1" oninput="draw()"><span id="qv">7</span></div>
+  <button onclick="resample()" style="font-size:12px;padding:4px 12px">New points</button>
+</div>
+
+<canvas id="cv"></canvas>
+<div class="note" id="note"></div>
+
+<script>
+const dark=matchMedia('(prefers-color-scheme:dark)').matches;
+const txt=dark?'#c2c0b6':'#3d3d3a';
+const txt2=dark?'#9c9a92':'#73726c';
+const gridC=dark?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.06)';
+
+const K=8;
+let pts=[];
+let view='2d';
+let rotY=0.6, rotX=0.7;
+let dragging=false, lastMX=0, lastMY=0;
+
+function randn(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+
+function resample(){
+  pts=[];
+  for(let i=0;i<K;i++) pts.push({x1:randn()*1.2, x2:randn()*1.2, nz:randn()});
+  recompute();
+}
+
+function recompute(){
+  const t1=+document.getElementById('t1').value/10;
+  const t2=+document.getElementById('t2').value/10;
+  const nsc=+document.getElementById('noise').value/10;
+  document.getElementById('t1v').textContent=t1.toFixed(1);
+  document.getElementById('t2v').textContent=t2.toFixed(1);
+  document.getElementById('nv').textContent=nsc.toFixed(1);
+  pts.forEach(p=>{
+    p.ytrue=t1*p.x1+t2*p.x2;
+    p.ynoisy=p.ytrue+p.nz*nsc;
+  });
+  draw();
+}
+
+function setView(v){
+  view=v;
+  document.getElementById('vt2d').classList.toggle('a',v==='2d');
+  document.getElementById('vt3d').classList.toggle('a',v==='3d');
+  draw();
+}
+
+function sc(){
+  const cv=document.getElementById('cv');
+  const dpr=window.devicePixelRatio||1;
+  const r=cv.getBoundingClientRect();
+  cv.width=r.width*dpr;cv.height=r.height*dpr;
+  const ctx=cv.getContext('2d');
+  ctx.scale(dpr,dpr);
+  return{ctx,w:r.width,h:r.height};
+}
+
+function proj3d(x,y,z,w,h){
+  const cY=Math.cos(rotY),sY=Math.sin(rotY),cX=Math.cos(rotX),sX=Math.sin(rotX);
+  const rx=x*cY-z*sY;
+  const rz=x*sY+z*cY;
+  const ry=y*cX-rz*sX;
+  const rz2=y*sX+rz*cX;
+  const sc=w*0.17;
+  return{sx:w/2+rx*sc, sy:h*0.45-ry*sc, depth:rz2};
+}
+
+function draw(){
+  const{ctx,w,h}=sc();
+  const t1=+document.getElementById('t1').value/10;
+  const t2=+document.getElementById('t2').value/10;
+  const qi=+document.getElementById('qidx').value;
+  document.getElementById('qv').textContent=qi;
+
+  if(view==='2d') draw2d(ctx,w,h,t1,t2,qi);
+  else draw3d(ctx,w,h,t1,t2,qi);
+
+  const nCtx=qi;
+  const qp=pts[qi];
+  document.getElementById('note').innerHTML=view==='2d'
+    ? `<strong style="color:var(--color-text-primary)">2D view:</strong> x₁ on horizontal, y on vertical (collapsing x₂). The line shows y = ${t1.toFixed(1)}·x₁ (ignoring x₂), so points scatter above/below it depending on their x₂ value. ${nCtx} blue context points visible. ${nCtx>=2?'Enough to determine the 2D task.':'Need more context.'}`
+    : `<strong style="color:var(--color-text-primary)">3D view:</strong> x₁, x₂ on the ground plane, y is height. The translucent surface is the true function. Drag to rotate. ${nCtx} blue context points visible. ${nCtx>=2?'Enough to pin down the plane.':'The plane is underdetermined.'}`;
+}
+
+function draw2d(ctx,w,h,t1,t2,qi){
+  const p={l:48,r:20,t:20,b:40};
+  const pw=w-p.l-p.r,ph=h-p.t-p.b;
+
+  const allY=pts.map(pt=>pt.ynoisy);
+  const allX=pts.map(pt=>pt.x1);
+  const xr=Math.max(...allX.map(Math.abs),1.5)*1.3;
+  const yr=Math.max(...allY.map(Math.abs),1.5)*1.3;
+
+  function tx(v){return p.l+(v/xr*0.5+0.5)*pw;}
+  function ty(v){return p.t+ph-(v/yr*0.5+0.5)*ph;}
+
+  // Grid
+  ctx.strokeStyle=gridC;ctx.lineWidth=0.5;
+  ctx.beginPath();ctx.moveTo(p.l,p.t);ctx.lineTo(p.l,p.t+ph);ctx.lineTo(p.l+pw,p.t+ph);ctx.stroke();
+  ctx.setLineDash([3,3]);
+  ctx.beginPath();ctx.moveTo(p.l,ty(0));ctx.lineTo(p.l+pw,ty(0));ctx.stroke();
+  ctx.beginPath();ctx.moveTo(tx(0),p.t);ctx.lineTo(tx(0),p.t+ph);ctx.stroke();
+  ctx.setLineDash([]);
+
+  // True line (just t1 component, since we're projecting to x1)
+  ctx.strokeStyle='#D85A30';ctx.lineWidth=2;ctx.globalAlpha=0.3;
+  ctx.beginPath();ctx.moveTo(tx(-xr),ty(-xr*t1));ctx.lineTo(tx(xr),ty(xr*t1));ctx.stroke();
+  ctx.globalAlpha=1;
+  ctx.fillStyle='#D85A30';ctx.font='11px var(--font-sans)';ctx.textAlign='left';
+  ctx.fillText('y = '+t1.toFixed(1)+'·x₁ (t₂·x₂ causes scatter)',p.l+4,p.t+14);
+
+  // Context points
+  for(let i=0;i<qi;i++){
+    const sx=tx(pts[i].x1),sy=ty(pts[i].ynoisy);
+    // Dashed line to true value
+    const syTrue=ty(pts[i].ytrue);
+    ctx.strokeStyle='#378ADD';ctx.lineWidth=0.5;ctx.globalAlpha=0.2;ctx.setLineDash([2,2]);
+    ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(sx,syTrue);ctx.stroke();
+    ctx.setLineDash([]);ctx.globalAlpha=1;
+    // Point
+    ctx.fillStyle='#378ADD';ctx.beginPath();ctx.arc(sx,sy,5,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=txt;ctx.font='10px var(--font-mono)';ctx.textAlign='center';
+    ctx.fillText(i+1,sx,sy-8);
+  }
+
+  // Future points (faded)
+  for(let i=qi+1;i<K;i++){
+    ctx.fillStyle=txt2;ctx.globalAlpha=0.15;
+    ctx.beginPath();ctx.arc(tx(pts[i].x1),ty(pts[i].ynoisy),4,0,Math.PI*2);ctx.fill();
+    ctx.globalAlpha=1;
+  }
+
+  // Query point
+  if(qi<K){
+    const qx=tx(pts[qi].x1),qyTrue=ty(pts[qi].ytrue),qyNoisy=ty(pts[qi].ynoisy);
+    // Vertical from x-axis
+    ctx.strokeStyle='#BA7517';ctx.lineWidth=1;ctx.setLineDash([3,3]);ctx.globalAlpha=0.4;
+    ctx.beginPath();ctx.moveTo(qx,ty(0));ctx.lineTo(qx,qyTrue);ctx.stroke();
+    ctx.setLineDash([]);ctx.globalAlpha=1;
+    // Error line
+    ctx.strokeStyle='#D85A30';ctx.lineWidth=1.5;ctx.setLineDash([2,2]);ctx.globalAlpha=0.6;
+    ctx.beginPath();ctx.moveTo(qx,qyTrue);ctx.lineTo(qx,qyNoisy);ctx.stroke();
+    ctx.setLineDash([]);ctx.globalAlpha=1;
+    // Prediction (on line)
+    ctx.fillStyle='#D85A30';ctx.beginPath();ctx.arc(qx,qyTrue,7,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
+    // Noisy target (hollow)
+    ctx.strokeStyle='#D85A30';ctx.lineWidth=2;
+    ctx.beginPath();ctx.arc(qx,qyNoisy,6,0,Math.PI*2);ctx.stroke();
+    // Labels
+    ctx.fillStyle='#D85A30';ctx.font='500 11px var(--font-sans)';ctx.textAlign='left';
+    ctx.fillText('ŷ = '+pts[qi].ytrue.toFixed(2)+' (on plane)',qx+10,qyTrue+3);
+    ctx.fillText('y = '+pts[qi].ynoisy.toFixed(2)+' (noisy target)',qx+10,qyNoisy+3);
+    // x marker
+    ctx.fillStyle='#BA7517';ctx.font='500 11px var(--font-mono)';ctx.textAlign='center';
+    ctx.fillText('x'+(qi+1),qx,ty(0)+16);
+  }
+
+  ctx.fillStyle='#0C447C';ctx.font='500 12px var(--font-sans)';ctx.textAlign='center';
+  ctx.fillText('x₁',p.l+pw/2,h-10);
+  ctx.save();ctx.translate(14,p.t+ph/2);ctx.rotate(-Math.PI/2);ctx.fillStyle='#534AB7';ctx.textAlign='center';ctx.fillText('y',0,0);ctx.restore();
+}
+
+function draw3d(ctx,w,h,t1,t2,qi){
+  const range=2.2;
+  const drawList=[];
+
+  // Plane mesh
+  const gn=12;
+  for(let i=0;i<gn;i++){
+    for(let j=0;j<gn;j++){
+      const x0=(i/gn-0.5)*2*range, x1_=((i+1)/gn-0.5)*2*range;
+      const z0=(j/gn-0.5)*2*range, z1_=((j+1)/gn-0.5)*2*range;
+      const y00=t1*x0+t2*z0, y10=t1*x1_+t2*z0;
+      const y11=t1*x1_+t2*z1_, y01=t1*x0+t2*z1_;
+      const p00=proj3d(x0,y00,z0,w,h),p10=proj3d(x1_,y10,z0,w,h);
+      const p11=proj3d(x1_,y11,z1_,w,h),p01=proj3d(x0,y01,z1_,w,h);
+      drawList.push({type:'quad',pts:[p00,p10,p11,p01],depth:(p00.depth+p10.depth+p11.depth+p01.depth)/4});
+    }
+  }
+
+  // Axes
+  const al=range*1.1;
+  [{f:[0,0,0],t:[al,0,0],l:'x₁',c:'#378ADD'},
+   {f:[0,0,0],t:[0,al*1.5,0],l:'y',c:'#7F77DD'},
+   {f:[0,0,0],t:[0,0,al],l:'x₂',c:'#1D9E75'}].forEach(a=>{
+    const pf=proj3d(...a.f,w,h),pt=proj3d(...a.t,w,h);
+    drawList.push({type:'axis',from:pf,to:pt,label:a.l,color:a.c,depth:(pf.depth+pt.depth)/2-10});
+  });
+
+  // Points
+  pts.forEach((d,i)=>{
+    const isCtx=i<qi, isQ=i===qi, isFut=i>qi;
+    const pT=proj3d(d.x1,d.ytrue,d.x2,w,h);
+    const pN=proj3d(d.x1,d.ynoisy,d.x2,w,h);
+    const pG=proj3d(d.x1,0,d.x2,w,h);
+
+    if(isQ){
+      drawList.push({type:'line',from:pG,to:pT,color:'#BA7517',width:1.5,dash:[4,3],depth:pT.depth+0.1,opacity:0.5});
+      drawList.push({type:'line',from:pT,to:pN,color:'#D85A30',width:1.5,dash:[2,2],depth:pN.depth+0.2,opacity:0.6});
+      drawList.push({type:'point',p:pT,r:7,color:'#D85A30',stroke:'#fff',sw:2,depth:pT.depth+0.3,label:'ŷ='+d.ytrue.toFixed(2)});
+      drawList.push({type:'point',p:pN,r:5,color:'#D85A30',depth:pN.depth+0.3,hollow:true,stroke:'#D85A30',sw:2,label:'y='+d.ynoisy.toFixed(2)});
+      drawList.push({type:'point',p:pG,r:4,color:'#BA7517',depth:pG.depth+0.1});
+    } else if(isCtx){
+      drawList.push({type:'line',from:pG,to:pN,color:'#378ADD',width:0.7,dash:[2,2],depth:pN.depth,opacity:0.2});
+      drawList.push({type:'point',p:pN,r:4,color:'#378ADD',depth:pN.depth+0.2});
+    } else {
+      drawList.push({type:'point',p:pN,r:3,color:txt2,depth:pN.depth+0.2,opacity:0.15});
+    }
+  });
+
+  drawList.sort((a,b)=>a.depth-b.depth);
+
+  drawList.forEach(it=>{
+    ctx.globalAlpha=it.opacity||1;
+    if(it.type==='quad'){
+      const[p0,p1,p2,p3]=it.pts;
+      const b=Math.max(0,Math.min(1,0.5+it.depth*0.1));
+      ctx.fillStyle=dark?`rgba(${80+40*b},${75+40*b},${140+50*b},0.35)`:`rgba(${170+40*b},${165+40*b},${220+20*b},0.3)`;
+      ctx.strokeStyle=dark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.03)';
+      ctx.lineWidth=0.5;
+      ctx.beginPath();ctx.moveTo(p0.sx,p0.sy);ctx.lineTo(p1.sx,p1.sy);ctx.lineTo(p2.sx,p2.sy);ctx.lineTo(p3.sx,p3.sy);ctx.closePath();ctx.fill();ctx.stroke();
+    } else if(it.type==='axis'){
+      ctx.strokeStyle=it.color;ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.moveTo(it.from.sx,it.from.sy);ctx.lineTo(it.to.sx,it.to.sy);ctx.stroke();
+      ctx.fillStyle=it.color;ctx.font='500 13px var(--font-sans)';ctx.textAlign='center';
+      ctx.fillText(it.label,it.to.sx+10,it.to.sy-6);
+    } else if(it.type==='line'){
+      ctx.strokeStyle=it.color;ctx.lineWidth=it.width||1;
+      if(it.dash)ctx.setLineDash(it.dash);
+      ctx.beginPath();ctx.moveTo(it.from.sx,it.from.sy);ctx.lineTo(it.to.sx,it.to.sy);ctx.stroke();
+      ctx.setLineDash([]);
+    } else if(it.type==='point'){
+      if(it.hollow){
+        ctx.strokeStyle=it.stroke||it.color;ctx.lineWidth=it.sw||1.5;
+        ctx.beginPath();ctx.arc(it.p.sx,it.p.sy,it.r,0,Math.PI*2);ctx.stroke();
+      } else {
+        ctx.fillStyle=it.color;ctx.beginPath();ctx.arc(it.p.sx,it.p.sy,it.r,0,Math.PI*2);ctx.fill();
+        if(it.stroke){ctx.strokeStyle=it.stroke;ctx.lineWidth=it.sw||1;ctx.stroke();}
+      }
+      if(it.label){ctx.fillStyle=it.color;ctx.font='500 11px var(--font-sans)';ctx.textAlign='left';ctx.fillText(it.label,it.p.sx+it.r+4,it.p.sy+3);}
+    }
+    ctx.globalAlpha=1;
+  });
+
+  ctx.fillStyle=txt2;ctx.font='11px var(--font-sans)';ctx.textAlign='left';
+  ctx.fillText('Drag to rotate',12,h-8);
+}
+
+const cv=document.getElementById('cv');
+cv.addEventListener('mousedown',e=>{if(view==='3d'){dragging=true;lastMX=e.clientX;lastMY=e.clientY;}});
+window.addEventListener('mousemove',e=>{
+  if(!dragging)return;
+  rotY+=(e.clientX-lastMX)*0.008;rotX+=(e.clientY-lastMY)*0.008;
+  rotX=Math.max(-1.2,Math.min(1.2,rotX));
+  lastMX=e.clientX;lastMY=e.clientY;draw();
+});
+window.addEventListener('mouseup',()=>{dragging=false;});
+cv.addEventListener('touchstart',e=>{if(view==='3d'){e.preventDefault();dragging=true;lastMX=e.touches[0].clientX;lastMY=e.touches[0].clientY;}},{passive:false});
+cv.addEventListener('touchmove',e=>{
+  if(!dragging)return;e.preventDefault();
+  rotY+=(e.touches[0].clientX-lastMX)*0.008;rotX+=(e.touches[0].clientY-lastMY)*0.008;
+  rotX=Math.max(-1.2,Math.min(1.2,rotX));
+  lastMX=e.touches[0].clientX;lastMY=e.touches[0].clientY;draw();
+},{passive:false});
+cv.addEventListener('touchend',()=>{dragging=false;});
+
+resample();
+window.addEventListener('resize',draw);
+</script>

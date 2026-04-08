@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;font-family:'Source Sans 3',sans-serif;background:#fff;color:#3a3a3a}
+#app{display:flex;flex-direction:column;width:100%;height:100%;padding:10px 16px 14px}
+
+.formula{background:#f6f6f4;border-radius:6px;padding:6px 14px;margin:0 0 8px;font-size:13px;color:#7a7a7a;text-align:center;line-height:1.7}
+.formula strong{color:#1a1a1a}
+
+.pset{display:flex;gap:6px;margin:0 0 8px;align-items:center;flex-wrap:wrap}
+.pset span{font-size:12px;color:#7a7a7a}
+.pset button{border:1px solid #ddd;background:#fff;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:12px;font-family:inherit;color:#3a3a3a}
+.pset button.a{background:#2d5a7b;border-color:#2d5a7b;color:#fff}
+
+.row2{display:flex;gap:8px;margin:0 0 6px}
+.card2{flex:1;border-radius:6px;padding:8px 10px;border:1px solid #e0e0e0;border-left-width:3px}
+.card2 h3{font-size:13px;font-weight:600;margin:0 0 4px}
+.pr2{display:flex;align-items:center;gap:6px;margin:2px 0}
+.pr2 label{font-size:12px;color:#7a7a7a;min-width:16px}
+.pr2 input[type=range]{flex:1;height:14px}
+.pr2 span{font-size:12px;font-weight:500;min-width:36px;text-align:right;font-family:monospace}
+
+.charts{display:flex;gap:10px;flex:1;min-height:0;margin-bottom:4px}
+.chart-wrap{flex:1;display:flex;flex-direction:column;min-width:0}
+.chart-label{font-size:13px;font-weight:600;color:#1a1a1a;margin:0 0 3px}
+.chart-wrap canvas{flex:1;width:100%;background:#f6f6f4;border-radius:6px}
+
+.note{font-size:13px;color:#7a7a7a;line-height:1.5;margin:10px 0 0}
+</style>
+</head>
+<body>
+<div id="app">
+
+<div class="formula">
+  <strong>Step 1:</strong> Fₙ(α) = n·L + λ·log(n) + c &nbsp;|&nbsp;
+  <strong>Step 2:</strong> proportion(α) = exp(−Fₙ) / Σ exp(−Fₙ) <span style="color:#a8a8a8">← softmax creates the sigmoids</span>
+</div>
+
+<div class="pset">
+  <span>Presets:</span>
+  <button class="a" onclick="lp(0,this)">5 → 6 gon</button>
+  <button onclick="lp(1,this)">4⁺ → 5 gon</button>
+  <button onclick="lp(2,this)">4 phases</button>
+</div>
+
+<div class="row2" id="cards"></div>
+
+<div class="charts">
+  <div class="chart-wrap">
+    <div class="chart-label">Raw free energies Fₙ</div>
+    <canvas id="cv1"></canvas>
+  </div>
+  <div class="chart-wrap">
+    <div class="chart-label">Posterior proportions</div>
+    <canvas id="cv2"></canvas>
+  </div>
+</div>
+
+<div class="note" id="note2"></div>
+
+</div>
+
+<script>
+const fg='#3a3a3a', mt='#7a7a7a', gridC='rgba(0,0,0,0.06)';
+const colors=['#c4933f','#5a8a5e','#2d5a7b','#8b6eae'];
+
+let phaseData=[
+  {name:'5-gon',L:0.069,lam:7.0,c:3.6,color:colors[0]},
+  {name:'6-gon',L:0.048,lam:8.5,c:6.4,color:colors[1]},
+];
+
+const presets=[
+  [
+    {name:'5-gon',L:0.069,lam:7.0,c:3.6,color:colors[0]},
+    {name:'6-gon',L:0.048,lam:8.5,c:6.4,color:colors[1]},
+  ],
+  [
+    {name:'4⁺-gon',L:0.104,lam:5.8,c:2.0,color:colors[0]},
+    {name:'5-gon',L:0.069,lam:7.0,c:3.6,color:colors[1]},
+  ],
+  [
+    {name:'4-gon',L:0.111,lam:5.3,c:2.0,color:colors[0]},
+    {name:'4⁺-gon',L:0.104,lam:5.8,c:2.0,color:colors[1]},
+    {name:'5-gon',L:0.069,lam:7.0,c:3.6,color:colors[2]},
+    {name:'6-gon',L:0.048,lam:8.5,c:6.4,color:colors[3]},
+  ],
+];
+
+function lp(i,btn){
+  document.querySelectorAll('.pset button').forEach(b=>b.classList.remove('a'));
+  btn.classList.add('a');
+  phaseData=presets[i].map(p=>({...p}));
+  buildCards(); draw2();
+}
+
+function buildCards(){
+  document.getElementById('cards').innerHTML=phaseData.map((p,i)=>`
+    <div class="card2" style="border-left-color:${p.color}">
+      <h3 style="color:${p.color}">${p.name}</h3>
+      <div class="pr2"><label>L</label><input type="range" min="1" max="200" value="${Math.round(p.L*1000)}" step="1" oninput="upd(${i},'L',this.value)"><span id="pL${i}">${p.L.toFixed(3)}</span></div>
+      <div class="pr2"><label>λ</label><input type="range" min="5" max="150" value="${Math.round(p.lam*10)}" step="1" oninput="upd(${i},'lam',this.value)"><span id="pl${i}">${p.lam.toFixed(1)}</span></div>
+      <div class="pr2"><label>c</label><input type="range" min="0" max="150" value="${Math.round(p.c*10)}" step="1" oninput="upd(${i},'c',this.value)"><span id="pc${i}">${p.c.toFixed(1)}</span></div>
+    </div>
+  `).join('');
+}
+
+function upd(i,field,val){
+  if(field==='L'){phaseData[i].L=parseInt(val)/1000;document.getElementById('pL'+i).textContent=phaseData[i].L.toFixed(3);}
+  if(field==='lam'){phaseData[i].lam=parseInt(val)/10;document.getElementById('pl'+i).textContent=phaseData[i].lam.toFixed(1);}
+  if(field==='c'){phaseData[i].c=parseInt(val)/10;document.getElementById('pc'+i).textContent=phaseData[i].c.toFixed(1);}
+  draw2();
+}
+
+function setupCanvas(id){
+  const cv=document.getElementById(id);
+  const dpr=window.devicePixelRatio||1;
+  const rect=cv.getBoundingClientRect();
+  cv.width=rect.width*dpr; cv.height=rect.height*dpr;
+  const ctx=cv.getContext('2d');
+  ctx.scale(dpr,dpr);
+  return {ctx, w:rect.width, h:rect.height};
+}
+
+function Fn(p,n){return n*p.L+p.lam*Math.log(n)+p.c;}
+
+function draw2(){
+  const nMax=1400,nMin=50;
+  const samples=[];
+  let fMin=Infinity,fMax=-Infinity;
+
+  for(let n=nMin;n<=nMax;n+=3){
+    const row={n,fs:[],props:[]};
+    let minF=Infinity;
+    phaseData.forEach(p=>{
+      const f=Fn(p,n);
+      row.fs.push(f);
+      if(f<fMin)fMin=f;if(f>fMax)fMax=f;
+      if(f<minF)minF=f;
+    });
+    const exps=row.fs.map(f=>Math.exp(-(f-minF)));
+    const Z=exps.reduce((a,b)=>a+b,0);
+    row.props=exps.map(e=>e/Z);
+    samples.push(row);
+  }
+
+  // Chart 1: Free energies
+  const {ctx:ctx1,w:cw,h:ch}=setupCanvas('cv1');
+  const pad={l:42,r:14,t:14,b:36};
+  const pw=cw-pad.l-pad.r, ph=ch-pad.t-pad.b;
+  const fRange=fMax-fMin||1;
+
+  ctx1.strokeStyle=gridC;ctx1.lineWidth=0.5;
+  ctx1.beginPath();ctx1.moveTo(pad.l,pad.t);ctx1.lineTo(pad.l,pad.t+ph);ctx1.lineTo(pad.l+pw,pad.t+ph);ctx1.stroke();
+
+  ctx1.fillStyle=mt;ctx1.font="11px 'Source Sans 3'";ctx1.textAlign='center';
+  for(let n=200;n<=nMax;n+=200){
+    ctx1.fillText(n,pad.l+((n-nMin)/(nMax-nMin))*pw,pad.t+ph+16);
+  }
+  ctx1.fillText('n (effective sample size)',pad.l+pw/2,ch-2);
+  ctx1.textAlign='right';ctx1.fillText('Fₙ',pad.l-4,pad.t+10);
+
+  phaseData.forEach((p,pi)=>{
+    ctx1.beginPath();
+    samples.forEach((s,si)=>{
+      const x=pad.l+((s.n-nMin)/(nMax-nMin))*pw;
+      const y=pad.t+ph-((s.fs[pi]-fMin)/fRange)*ph*0.9-ph*0.03;
+      si===0?ctx1.moveTo(x,y):ctx1.lineTo(x,y);
+    });
+    ctx1.strokeStyle=p.color;ctx1.lineWidth=2.5;ctx1.stroke();
+    const lastS=samples[samples.length-1];
+    const ly=pad.t+ph-((lastS.fs[pi]-fMin)/fRange)*ph*0.9-ph*0.03;
+    ctx1.fillStyle=p.color;ctx1.font="600 12px 'Source Sans 3'";ctx1.textAlign='left';
+    ctx1.fillText(p.name,pad.l+pw-60,ly-4-pi*15);
+  });
+
+  // Chart 2: Proportions
+  const {ctx:ctx2,w:cw2,h:ch2}=setupCanvas('cv2');
+
+  ctx2.strokeStyle=gridC;ctx2.lineWidth=0.5;
+  ctx2.beginPath();ctx2.moveTo(pad.l,pad.t);ctx2.lineTo(pad.l,pad.t+ph);ctx2.lineTo(pad.l+pw,pad.t+ph);ctx2.stroke();
+
+  ctx2.fillStyle=mt;ctx2.font="11px 'Source Sans 3'";ctx2.textAlign='center';
+  for(let n=200;n<=nMax;n+=200){
+    ctx2.fillText(n,pad.l+((n-nMin)/(nMax-nMin))*pw,pad.t+ph+16);
+  }
+  ctx2.fillText('n (effective sample size)',pad.l+pw/2,ch2-2);
+  ctx2.textAlign='right';
+  ctx2.fillText('1.0',pad.l-4,pad.t+8);
+  ctx2.fillText('0.5',pad.l-4,pad.t+ph/2+4);
+  ctx2.fillText('0.0',pad.l-4,pad.t+ph+4);
+
+  ctx2.beginPath();ctx2.moveTo(pad.l,pad.t+ph/2);ctx2.lineTo(pad.l+pw,pad.t+ph/2);
+  ctx2.strokeStyle=gridC;ctx2.lineWidth=0.5;ctx2.setLineDash([3,3]);ctx2.stroke();ctx2.setLineDash([]);
+
+  phaseData.forEach((p,pi)=>{
+    ctx2.beginPath();
+    samples.forEach((s,si)=>{
+      const x=pad.l+((s.n-nMin)/(nMax-nMin))*pw;
+      const y=pad.t+ph-s.props[pi]*ph;
+      si===0?ctx2.moveTo(x,y):ctx2.lineTo(x,y);
+    });
+    ctx2.strokeStyle=p.color;ctx2.lineWidth=2.5;ctx2.stroke();
+  });
+
+  // Labels on proportion curves
+  phaseData.forEach((p,pi)=>{
+    const lastP=samples[samples.length-1].props[pi];
+    const ly=pad.t+ph-lastP*ph;
+    ctx2.fillStyle=p.color;ctx2.font="600 12px 'Source Sans 3'";ctx2.textAlign='left';
+    ctx2.fillText(p.name,pad.l+pw-60,ly+(lastP>0.5?14:-6));
+  });
+
+  // Crossover markers
+  for(let si=1;si<samples.length;si++){
+    for(let pi=0;pi<phaseData.length-1;pi++){
+      for(let pj=pi+1;pj<phaseData.length;pj++){
+        const d1=samples[si-1].props[pi]-samples[si-1].props[pj];
+        const d2=samples[si].props[pi]-samples[si].props[pj];
+        if(d1*d2<0){
+          const x=pad.l+((samples[si].n-nMin)/(nMax-nMin))*pw;
+          ctx2.beginPath();ctx2.moveTo(x,pad.t);ctx2.lineTo(x,pad.t+ph);
+          ctx2.strokeStyle=fg;ctx2.lineWidth=1;ctx2.setLineDash([3,3]);ctx2.globalAlpha=0.25;ctx2.stroke();
+          ctx2.setLineDash([]);ctx2.globalAlpha=1;
+          ctx2.fillStyle=fg;ctx2.font="500 12px 'Source Sans 3'";ctx2.textAlign='center';
+          ctx2.fillText('n≈'+samples[si].n,x,pad.t+ph+28);
+        }
+      }
+    }
+  }
+
+  // Note
+  const note=document.getElementById('note2');
+  if(phaseData.length===2){
+    note.textContent='Left: raw free energies cross subtly. Right: softmax amplifies the crossing into a sharp sigmoid transition.';
+  } else {
+    note.textContent='With multiple phases, the proportions show a cascade of transitions — each phase dominates briefly before being overtaken.';
+  }
+}
+
+buildCards();
+requestAnimationFrame(()=>requestAnimationFrame(draw2));
+window.addEventListener('resize', draw2);
+</script>
+</body></html>

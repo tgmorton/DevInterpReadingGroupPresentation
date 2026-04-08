@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;font-family:'Source Sans 3',sans-serif;background:#fff;color:#3a3a3a}
+#app{display:flex;flex-direction:column;width:100%;height:100%;padding:10px 16px 8px}
+.formula-bar{background:#f6f6f4;border-radius:6px;padding:5px 12px;margin:0 0 6px;font-size:13px;color:#7a7a7a;text-align:center;line-height:1.6}
+.formula-bar strong{color:#1a1a1a}
+.pset{display:flex;gap:4px;margin:0 0 6px}
+.pset button{font-size:12px;padding:4px 10px;border-radius:4px;cursor:pointer;border:1px solid #ddd;background:#fff;color:#7a7a7a;font-family:inherit}
+.pset button.a{background:#2d5a7b;color:#fff;border-color:#2d5a7b}
+.main-row{display:flex;gap:8px;flex:1;min-height:0;overflow:hidden}
+.panel{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden}
+.panel-label{font-size:12px;font-weight:600;margin:0 0 3px;color:#1a1a1a;flex-shrink:0}
+.panel canvas{flex:1;width:100%;min-height:0;border-radius:6px;background:#f6f6f4;display:block}
+.ctrl{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:12px;color:#7a7a7a}
+.ctrl input{flex:1}
+.ctrl span{min-width:36px;text-align:right;font-family:monospace;font-size:12px;color:#1a1a1a}
+.readouts{display:flex;gap:6px;margin:4px 0}
+.ro{flex:1;padding:6px 8px;border-radius:6px;border:1px solid #e0e0e0}
+.ro-label{font-size:10px;color:#7a7a7a;margin:0 0 1px}
+.ro-val{font-size:15px;font-weight:500;font-family:monospace}
+.ro-sub{font-size:10px;color:#7a7a7a;margin:2px 0 0}
+.ro.blind{border-color:#c45a3c;background:rgba(196,90,60,0.05)}
+.ro.blind .ro-val{color:#c45a3c}
+.ro.sees{border-left:3px solid #8b6eae;border-radius:0}
+.ro.sees .ro-val{color:#8b6eae}
+.note{font-size:12px;color:#7a7a7a;line-height:1.5;margin:4px 0 0}
+</style>
+</head>
+<body>
+<div id="app">
+<div class="formula-bar">
+  <strong>Hessian</strong> fits a parabola (2nd order) at the minimum |
+  <strong>LLC</strong> measures volume below a loss threshold ε
+</div>
+<div class="pset" id="presets"></div>
+<div class="main-row">
+  <div class="panel">
+    <div class="panel-label">Cross-section (y = 0)</div>
+    <canvas id="cv1"></canvas>
+  </div>
+  <div class="panel">
+    <div class="panel-label">2D loss landscape</div>
+    <canvas id="cv2"></canvas>
+  </div>
+</div>
+<div class="ctrl">
+  <span style="min-width:10px">ε</span>
+  <input type="range" id="eps" min="2" max="80" value="25" step="1" oninput="draw()">
+  <span id="eps-v">0.25</span>
+</div>
+<div class="readouts" id="readouts"></div>
+<div class="note" id="note"></div>
+</div>
+
+<script>
+const txt='#3a3a3a',txt2='#7a7a7a',gridC='rgba(0,0,0,0.06)';
+const purple='#8b6eae',coral='#c45a3c';
+
+const cases=[
+  {name:'x² + y²',px:2,py:2,fn:(x,y)=>x**2+y**2,slice:x=>x**2,hess:x=>x**2,hTrace:4,hRank:2,hEig:'2, 2',llc:1.0,
+   note:'Both agree. The Hessian parabola (dashed) fits the actual curve perfectly. No degeneracy to miss.'},
+  {name:'x⁴ + y⁴',px:4,py:4,fn:(x,y)=>x**4+y**4,slice:x=>x**4,hess:x=>0,hTrace:0,hRank:0,hEig:'0, 0',llc:0.5,
+   note:'Hessian collapses to a flat line — thinks the landscape is flat. But the actual curve has quartic structure. The LLC captures this; the Hessian is blind.'},
+  {name:'x² + y⁴',px:2,py:4,fn:(x,y)=>x**2+y**4,slice:x=>x**2,hess:x=>x**2,hTrace:2,hRank:1,hEig:'2, 0',llc:0.75,
+   note:'x-slice looks quadratic (Hessian fits it), but misses the quartic y-direction (rank 1). LLC = 3/4 correctly reflects the mixed geometry.'},
+  {name:'x²y⁴',px:2,py:4,fn:(x,y)=>x**2*y**4,slice:x=>0,hess:x=>0,hTrace:0,hRank:0,hEig:'0, 0',llc:0.25,
+   note:'Along x-axis (y=0), loss is identically zero — a flat valley. Hessian says rank 0 (same as quartic). LLC = 1/4 captures the extreme degeneracy.'},
+];
+
+let cur=0;
+function buildUI(){document.getElementById('presets').innerHTML=cases.map((c,i)=>`<button class="${i===cur?'a':''}" onclick="sel(${i})">${c.name}</button>`).join('');}
+function sel(i){cur=i;buildUI();draw();}
+
+function sc(id){
+  const cv=document.getElementById(id),dpr=window.devicePixelRatio||1;
+  const rect=cv.getBoundingClientRect();
+  const w=Math.floor(rect.width),h=Math.floor(rect.height);
+  if(w<10||h<10) return{ctx:cv.getContext('2d'),w:300,h:200};
+  cv.width=w*dpr;cv.height=h*dpr;
+  const ctx=cv.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
+  return{ctx,w,h};
+}
+
+function draw(){
+  const c=cases[cur],eps=+document.getElementById('eps').value/100;
+  document.getElementById('eps-v').textContent=eps.toFixed(2);
+
+  // Cross-section
+  const{ctx:c1,w:w1,h:h1}=sc('cv1');
+  const p={l:30,r:10,t:12,b:20};
+  const pw=w1-p.l-p.r,ph=h1-p.t-p.b;
+  const xRange=1.3,yMax=1.2;
+  c1.strokeStyle=gridC;c1.lineWidth=0.5;
+  c1.beginPath();c1.moveTo(p.l,p.t);c1.lineTo(p.l,p.t+ph);c1.lineTo(p.l+pw,p.t+ph);c1.stroke();
+  function tx(x){return p.l+(x/xRange*0.5+0.5)*pw;}
+  function ty(v){return p.t+ph-Math.min(v/yMax,1)*ph;}
+
+  // Flood region
+  const epsY=ty(eps);
+  c1.beginPath();let started=false;
+  for(let px=0;px<=pw;px++){const x=(px/pw-0.5)*2*xRange,v=c.slice(x);
+    if(v<=eps){const sx=p.l+px;if(!started){c1.moveTo(sx,epsY);started=true;}c1.lineTo(sx,ty(v));}}
+  if(started){c1.lineTo(tx(xRange),epsY);c1.closePath();c1.fillStyle='rgba(139,110,174,0.15)';c1.fill();}
+
+  c1.strokeStyle=purple;c1.lineWidth=1;c1.setLineDash([4,4]);
+  c1.beginPath();c1.moveTo(p.l,epsY);c1.lineTo(p.l+pw,epsY);c1.stroke();c1.setLineDash([]);
+  c1.fillStyle=purple;c1.font="500 11px 'Source Sans 3'";c1.textAlign='left';c1.fillText('ε='+eps.toFixed(2),p.l+4,epsY-4);
+
+  // Hessian parabola
+  c1.beginPath();
+  for(let px=0;px<=pw;px++){const x=(px/pw-0.5)*2*xRange;px===0?c1.moveTo(p.l+px,ty(c.hess(x))):c1.lineTo(p.l+px,ty(c.hess(x)));}
+  c1.strokeStyle=coral;c1.lineWidth=2;c1.setLineDash([6,4]);c1.stroke();c1.setLineDash([]);
+
+  // Actual function
+  c1.beginPath();
+  for(let px=0;px<=pw;px++){const x=(px/pw-0.5)*2*xRange;px===0?c1.moveTo(p.l+px,ty(c.slice(x))):c1.lineTo(p.l+px,ty(c.slice(x)));}
+  c1.strokeStyle=txt;c1.lineWidth=2;c1.stroke();
+
+  c1.font="11px 'Source Sans 3'";c1.textAlign='left';
+  c1.fillStyle=txt;c1.fillText('actual',p.l+6,p.t+10);
+  c1.fillStyle=coral;c1.fillText('Hessian',p.l+6,p.t+24);
+  c1.fillStyle=purple;c1.fillText('V(ε)',p.l+6,p.t+38);
+
+  // 2D contour
+  const{ctx:c2,w:w2,h:h2}=sc('cv2');
+  const p2={l:6,r:6,t:6,b:6},pw2=w2-p2.l-p2.r,ph2=h2-p2.t-p2.b;
+  const r2=1.3,res=2;
+  for(let px=0;px<pw2;px+=res){for(let py=0;py<ph2;py+=res){
+    const x=(px/pw2-0.5)*2*r2,y=(py/ph2-0.5)*2*r2,v=c.fn(x,y);
+    let r,g,b2;
+    if(v<=eps){const t=Math.max(0,Math.min(v/Math.max(eps,0.001),1));r=Math.round(139+70*(1-t));g=Math.round(110+70*(1-t));b2=174;}
+    else{const t=Math.min((v-eps)/1.0,1);r=g=b2=Math.round(238-55*t);}
+    c2.fillStyle=`rgb(${r},${g},${b2})`;c2.fillRect(p2.l+px,p2.t+py,res,res);
+  }}
+
+  // Epsilon contour
+  for(let px=0;px<pw2-res;px+=res){for(let py=0;py<ph2-res;py+=res){
+    const x=(px/pw2-0.5)*2*r2,y=(py/ph2-0.5)*2*r2,v=c.fn(x,y);
+    const vr=c.fn(((px+res)/pw2-0.5)*2*r2,y),vd=c.fn(x,((py+res)/ph2-0.5)*2*r2);
+    if((v-eps)*(vr-eps)<0||(v-eps)*(vd-eps)<0){c2.fillStyle=purple;c2.fillRect(p2.l+px,p2.t+py,1.5,1.5);}
+  }}
+
+  // Slice indicator
+  c2.strokeStyle='rgba(0,0,0,0.25)';c2.lineWidth=1;c2.setLineDash([3,3]);
+  c2.beginPath();c2.moveTo(p2.l,p2.t+ph2/2);c2.lineTo(p2.l+pw2,p2.t+ph2/2);c2.stroke();c2.setLineDash([]);
+
+  // Volume
+  let inC=0,tot=0;const samp=150;
+  for(let si=0;si<samp;si++){for(let sj=0;sj<samp;sj++){tot++;if(c.fn((si/samp-0.5)*2*r2,(sj/samp-0.5)*2*r2)<=eps)inC++;}}
+  const vol=inC/tot*4*r2*r2;
+
+  const hB=c.hRank===0;
+  document.getElementById('readouts').innerHTML=`
+    <div class="ro ${hB?'blind':''}"><div class="ro-label">Hessian</div><div class="ro-val">${hB?'Flat!':'trace='+c.hTrace}</div><div class="ro-sub">rank ${c.hRank}, eig [${c.hEig}]</div></div>
+    <div class="ro sees"><div class="ro-label">LLC</div><div class="ro-val">λ = ${c.llc}</div><div class="ro-sub">V(ε) area = ${vol.toFixed(3)}</div></div>`;
+  document.getElementById('note').textContent=c.note;
+}
+
+buildUI();
+requestAnimationFrame(()=>requestAnimationFrame(draw));
+window.addEventListener('resize',draw);
+</script>
+</body></html>

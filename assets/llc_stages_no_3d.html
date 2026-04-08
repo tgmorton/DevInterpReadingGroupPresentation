@@ -1,0 +1,272 @@
+
+<style>
+.top-row{display:flex;gap:6px;margin:0 0:4px}
+.left{width:220px;min-width:220px;display:flex;flex-direction:column;gap:4px}
+.left canvas{width:100%;border-radius:var(--border-radius-md);background:var(--color-background-secondary)}
+.left-label{font-size:11px;font-weight:500;color:var(--color-text-primary)}
+.right{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.right canvas{width:100%;border-radius:var(--border-radius-md);background:var(--color-background-secondary)}
+.note{font-size:12px;color:var(--color-text-secondary);line-height:1.6;padding:6px 10px;border-radius:var(--border-radius-md);background:var(--color-background-secondary);margin:2px 0 0}
+</style>
+
+<div class="top-row">
+  <div class="left">
+    <div class="left-label">SGLD chains on landscape</div>
+    <canvas id="cv0" style="height:168px"></canvas>
+    <div class="left-label">Cross-section (y = 0) + chain samples</div>
+    <canvas id="cvX" style="height:120px"></canvas>
+  </div>
+  <div class="right">
+    <canvas id="cv1" style="height:148px"></canvas>
+    <canvas id="cv2" style="height:130px"></canvas>
+  </div>
+</div>
+
+<div class="note" id="note"></div>
+
+<script>
+const dark=matchMedia('(prefers-color-scheme:dark)').matches;
+const txt=dark?'#c2c0b6':'#3d3d3a';
+const txt2=dark?'#9c9a92':'#73726c';
+const gridC=dark?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.06)';
+
+const stageColors=['#c4933f','#c4933f','#5a8a5e','#2d5a7b','#8b6eae'];
+const stageNames=['LM1','LM2','LM3','LM4','LM5'];
+const stageBounds=[100,900,6500,8500,17000,50000];
+const stageDescs=[
+  'LM1 (100–900): Learning bigrams. Broad, gently curved landscape — chains wander widely. LLC rising as structure builds.',
+  'LM2 (900–6.5k): Learning n-grams, positional embedding, K-composition wiring. Landscape tightens — chains contract. Steepest LLC rise.',
+  'LM3 (6.5k–8.5k): Previous-token heads form. Head interaction opens a degenerate valley — chains spread along it. LLC dips. The only sustained negative derivative.',
+  'LM4 (8.5k–17k): Induction heads complete the circuit. Valley closes, landscape tightens. ICL emerges. LLC rises again.',
+  'LM5 (17k–50k): Refinement. Stable landscape — consistent chain spread. LLC flat with noise. Derivative hovers near zero.',
+];
+
+function llcCurve(t){
+  if(t<900) return 137+13*((t-100)/800)**0.7;
+  if(t<1500) return 150+1*((t-900)/600);
+  if(t<6500) return 151+21*((t-1500)/5000)**0.8;
+  if(t<7500) return 172-2*((t-6500)/1000);
+  if(t<8500) return 170;
+  if(t<17000) return 170+10*((t-8500)/8500)**0.6;
+  if(t<30000) return 180+2*((t-17000)/13000)**0.5;
+  return 181.5+0.5*Math.sin((t-30000)/5000);
+}
+
+const tPoints=[];
+for(let lt=2;lt<=Math.log10(50000);lt+=0.008) tPoints.push({t:Math.pow(10,lt),llc:llcCurve(Math.pow(10,lt))});
+
+const derivData=[];
+for(let i=0;i<tPoints.length;i++){
+  if(i<3||i>tPoints.length-4){derivData.push(0);continue;}
+  let s=0,c=0;
+  for(let j=-6;j<=6;j++){
+    if(j===0||i+j<0||i+j>=tPoints.length) continue;
+    const dl=tPoints[i+j].llc-tPoints[i].llc;
+    const dt=Math.log(tPoints[i+j].t)-Math.log(tPoints[i].t);
+    if(Math.abs(dt)>0.001){s+=dl/dt;c++;}
+  }
+  derivData.push(c?s/c:0);
+}
+// Smooth + late noise
+const sm=new Float64Array(derivData.length);
+for(let i=0;i<derivData.length;i++){let s=0,c=0;for(let j=-4;j<=4;j++){if(i+j>=0&&i+j<derivData.length){s+=derivData[i+j];c++;}}sm[i]=s/c;}
+for(let i=0;i<derivData.length;i++){derivData[i]=sm[i];if(tPoints[i].t>15000)derivData[i]+=(Math.random()-0.5)*6*(tPoints[i].t/50000);}
+
+const zeroCrossings=[];
+for(let i=1;i<derivData.length;i++) if(derivData[i-1]*derivData[i]<0) zeroCrossings.push(i);
+
+function getStage(t){for(let i=0;i<stageBounds.length-1;i++) if(t>=stageBounds[i]&&t<stageBounds[i+1]) return i;return 4;}
+
+function landscape(x,y,stg){
+  if(stg===0) return 0.4*(Math.abs(x)**2.8+Math.abs(y)**2.8);
+  if(stg===1) return 1.2*(x*x+Math.abs(y)**2.2);
+  if(stg===2) return 0.6*x*x+0.12*y*y+1.8*x*x*y*y;
+  if(stg===3) return 1.5*(x*x+y*y);
+  return 1.4*(x*x+y*y);
+}
+function lgrad(x,y,stg){const h=0.001;return[(landscape(x+h,y,stg)-landscape(x-h,y,stg))/(2*h),(landscape(x,y+h,stg)-landscape(x,y-h,stg))/(2*h)];}
+function sliceY0(x,stg){return landscape(x,0,stg);}
+
+const nChains=10;
+const chainCols=['#c4933f','#5a8a5e','#2d5a7b','#8b6eae','#D85A30','#D4537E','#7F77DD','#639922','#888780','#BA7517'];
+let chains=[],curIdx=0;
+function initChains(){chains=[];for(let i=0;i<nChains;i++)chains.push({x:0,y:0,trail:[]});}
+function runSGLD(stg,steps){
+  const eps=0.005,gamma=45,nb=20;
+  for(let s=0;s<steps;s++) chains.forEach(ch=>{
+    const[gx,gy]=lgrad(ch.x,ch.y,stg);
+    ch.x-=(eps/2)*(nb*gx+gamma/2*ch.x)-(Math.random()-0.5)*2*Math.sqrt(eps)*1.1;
+    ch.y-=(eps/2)*(nb*gy+gamma/2*ch.y)-(Math.random()-0.5)*2*Math.sqrt(eps)*1.1;
+    ch.trail.push({x:ch.x,y:ch.y});if(ch.trail.length>50)ch.trail.shift();
+  });
+}
+
+function sc(id){const cv=document.getElementById(id);const dpr=window.devicePixelRatio||1;const r=cv.getBoundingClientRect();cv.width=r.width*dpr;cv.height=r.height*dpr;const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);return{ctx,w:r.width,h:r.height};}
+
+function render(){
+  const t=tPoints[curIdx].t;
+  const stg=getStage(t);
+  const range=0.65;
+
+  // 2D contour
+  const{ctx:c0,w:w0,h:h0}=sc('cv0');
+  const m=6,pw0=w0-2*m,ph0=h0-2*m,res=2;
+  for(let px=0;px<pw0;px+=res){for(let py=0;py<ph0;py+=res){
+    const x=(px/pw0-0.5)*2*range,y=(py/ph0-0.5)*2*range;
+    const vn=Math.min(landscape(x,y,stg)/0.6,1);
+    let r,g,b;if(dark){r=g=b=Math.round(40+45*vn);}else{r=g=b=Math.round(244-70*vn);}
+    c0.fillStyle=`rgb(${r},${g},${b})`;c0.fillRect(m+px,m+py,res,res);
+  }}
+  [0.01,0.04,0.1,0.2,0.4].forEach(lev=>{
+    for(let px=0;px<pw0-res;px+=res){for(let py=0;py<ph0-res;py+=res){
+      const x=(px/pw0-0.5)*2*range,y=(py/ph0-0.5)*2*range;
+      const v=landscape(x,y,stg),vr=landscape(((px+res)/pw0-0.5)*2*range,y,stg),vd=landscape(x,((py+res)/ph0-0.5)*2*range,stg);
+      if((v-lev)*(vr-lev)<0||(v-lev)*(vd-lev)<0){c0.fillStyle=dark?'rgba(255,255,255,0.12)':'rgba(0,0,0,0.08)';c0.fillRect(m+px,m+py,1,1);}
+    }}
+  });
+  // y=0 slice indicator
+  const midY=m+ph0/2;
+  c0.strokeStyle=dark?'rgba(255,255,255,0.25)':'rgba(0,0,0,0.15)';c0.lineWidth=1;c0.setLineDash([4,3]);
+  c0.beginPath();c0.moveTo(m,midY);c0.lineTo(m+pw0,midY);c0.stroke();c0.setLineDash([]);
+  c0.fillStyle=txt2;c0.font='10px var(--font-sans)';c0.textAlign='right';c0.fillText('y=0',m+pw0-3,midY-3);
+
+  function tx0(x){return m+(x/range*0.5+0.5)*pw0;}
+  function ty0(y){return m+(y/range*0.5+0.5)*ph0;}
+  chains.forEach((ch,ci)=>{
+    if(ch.trail.length>1){c0.beginPath();ch.trail.forEach((pt,i)=>{i===0?c0.moveTo(tx0(pt.x),ty0(pt.y)):c0.lineTo(tx0(pt.x),ty0(pt.y));});c0.strokeStyle=chainCols[ci];c0.lineWidth=0.7;c0.globalAlpha=0.3;c0.stroke();c0.globalAlpha=1;}
+    c0.fillStyle=chainCols[ci];c0.beginPath();c0.arc(tx0(ch.x),ty0(ch.y),3,0,Math.PI*2);c0.fill();
+  });
+  c0.fillStyle=stageColors[stg];c0.font='500 12px var(--font-sans)';c0.textAlign='left';
+  c0.fillText(stageNames[stg]+' · t='+Math.round(t),m+4,h0-m-3);
+
+  // Cross-section
+  const{ctx:cX,w:wX,h:hX}=sc('cvX');
+  const pX={l:6,r:6,t:10,b:6};
+  const pwX=wX-pX.l-pX.r,phX=hX-pX.t-pX.b;
+  const yMax=0.6;
+  function txX(x){return pX.l+(x/range*0.5+0.5)*pwX;}
+  function tyX(v){return pX.t+phX-Math.min(v/yMax,1)*phX;}
+
+  // Fill under curve
+  cX.beginPath();cX.moveTo(pX.l,tyX(sliceY0(-range,stg)));
+  for(let px=0;px<=pwX;px++){const x=(px/pwX-0.5)*2*range;cX.lineTo(pX.l+px,tyX(sliceY0(x,stg)));}
+  cX.lineTo(pX.l+pwX,pX.t+phX);cX.lineTo(pX.l,pX.t+phX);cX.closePath();
+  cX.fillStyle=dark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.03)';cX.fill();
+
+  // Curve
+  cX.beginPath();
+  for(let px=0;px<=pwX;px++){const x=(px/pwX-0.5)*2*range;const v=sliceY0(x,stg);px===0?cX.moveTo(pX.l+px,tyX(v)):cX.lineTo(pX.l+px,tyX(v));}
+  cX.strokeStyle=txt;cX.lineWidth=2;cX.stroke();
+
+  // Chain x-positions projected onto cross-section
+  chains.forEach((ch,ci)=>{
+    const v=sliceY0(ch.x,stg);
+    const sx=txX(ch.x),sy=tyX(v);
+    // Vertical line from chain to curve
+    cX.strokeStyle=chainCols[ci];cX.lineWidth=0.5;cX.globalAlpha=0.3;
+    cX.beginPath();cX.moveTo(sx,pX.t+phX);cX.lineTo(sx,sy);cX.stroke();cX.globalAlpha=1;
+    // Dot on curve
+    cX.fillStyle=chainCols[ci];cX.beginPath();cX.arc(sx,sy,2.5,0,Math.PI*2);cX.fill();
+  });
+
+  // Spread indicator
+  const xs=chains.map(ch=>ch.x);
+  const xMin=Math.min(...xs),xMax=Math.max(...xs);
+  const spreadX0=txX(xMin),spreadX1=txX(xMax);
+  cX.strokeStyle=stageColors[stg];cX.lineWidth=1.5;
+  cX.beginPath();cX.moveTo(spreadX0,pX.t+phX-3);cX.lineTo(spreadX1,pX.t+phX-3);cX.stroke();
+  cX.beginPath();cX.moveTo(spreadX0,pX.t+phX-6);cX.lineTo(spreadX0,pX.t+phX);cX.stroke();
+  cX.beginPath();cX.moveTo(spreadX1,pX.t+phX-6);cX.lineTo(spreadX1,pX.t+phX);cX.stroke();
+  cX.fillStyle=stageColors[stg];cX.font='500 10px var(--font-sans)';cX.textAlign='center';
+  cX.fillText('chain spread',(spreadX0+spreadX1)/2,pX.t+phX-6);
+
+  cX.fillStyle=txt2;cX.font='10px var(--font-sans)';cX.textAlign='left';cX.fillText('ℓ(x, 0)',pX.l+2,pX.t+8);
+
+  // LLC curve
+  const{ctx:c1,w:w1,h:h1}=sc('cv1');
+  const p1={l:36,r:12,t:12,b:20};
+  const pw1=w1-p1.l-p1.r,ph1=h1-p1.t-p1.b;
+  const logMin=2,logMax=Math.log10(50000);
+  const llcMin=135,llcMax=185;
+  function txL(t){return p1.l+((Math.log10(Math.max(t,100))-logMin)/(logMax-logMin))*pw1;}
+  function tyL(v){return p1.t+ph1-((v-llcMin)/(llcMax-llcMin))*ph1;}
+
+  c1.strokeStyle=gridC;c1.lineWidth=0.5;
+  c1.beginPath();c1.moveTo(p1.l,p1.t);c1.lineTo(p1.l,p1.t+ph1);c1.lineTo(p1.l+pw1,p1.t+ph1);c1.stroke();
+  for(let v=140;v<=180;v+=10){const yy=tyL(v);c1.beginPath();c1.moveTo(p1.l,yy);c1.lineTo(p1.l+pw1,yy);c1.stroke();c1.fillStyle=txt2;c1.font='10px var(--font-mono)';c1.textAlign='right';c1.fillText(v,p1.l-3,yy+3);}
+  [100,1000,10000].forEach(v=>{c1.fillStyle=txt2;c1.font='10px var(--font-mono)';c1.textAlign='center';c1.fillText(v>=1000?(v/1000)+'k':v,txL(v),p1.t+ph1+14);});
+
+  for(let s=0;s<5;s++){const x0=txL(stageBounds[s]),x1=txL(stageBounds[s+1]);c1.fillStyle=stageColors[s];c1.globalAlpha=0.07;c1.fillRect(x0,p1.t,x1-x0,ph1);c1.globalAlpha=1;c1.font='500 10px var(--font-sans)';c1.textAlign='center';c1.globalAlpha=0.5;c1.fillText(stageNames[s],(x0+x1)/2,p1.t+10);c1.globalAlpha=1;}
+
+  c1.beginPath();tPoints.forEach((pt,i)=>{const x=txL(pt.t),y=tyL(pt.llc);i===0?c1.moveTo(x,y):c1.lineTo(x,y);});
+  c1.strokeStyle='#c0392b';c1.lineWidth=3;c1.setLineDash([8,5]);c1.stroke();c1.setLineDash([]);
+
+  const cx=txL(t),cy=tyL(tPoints[curIdx].llc);
+  c1.fillStyle='#c0392b';c1.beginPath();c1.arc(cx,cy,5,0,Math.PI*2);c1.fill();
+  c1.strokeStyle=txt;c1.lineWidth=1;c1.setLineDash([2,2]);c1.beginPath();c1.moveTo(cx,p1.t);c1.lineTo(cx,p1.t+ph1);c1.stroke();c1.setLineDash([]);
+  c1.fillStyle=txt2;c1.font='11px var(--font-sans)';c1.save();c1.translate(8,p1.t+ph1/2);c1.rotate(-Math.PI/2);c1.textAlign='center';c1.fillText('λ̂(w_t)',0,0);c1.restore();
+
+  // Derivative
+  const{ctx:c2,w:w2,h:h2}=sc('cv2');
+  const p2={l:36,r:12,t:8,b:20};
+  const pw2=w2-p2.l-p2.r,ph2=h2-p2.t-p2.b;
+  c2.strokeStyle=gridC;c2.lineWidth=0.5;
+  c2.beginPath();c2.moveTo(p2.l,p2.t);c2.lineTo(p2.l,p2.t+ph2);c2.lineTo(p2.l+pw2,p2.t+ph2);c2.stroke();
+
+  let dMax=0;derivData.forEach(d=>{if(Math.abs(d)>dMax)dMax=Math.abs(d);});dMax=Math.max(dMax,5)*1.1;
+  function txD(t){return p2.l+((Math.log10(Math.max(t,100))-logMin)/(logMax-logMin))*pw2;}
+  function tyD(v){return p2.t+ph2/2-(v/dMax)*(ph2/2);}
+
+  for(let s=0;s<5;s++){const x0=txD(stageBounds[s]),x1=txD(stageBounds[s+1]);c2.fillStyle=stageColors[s];c2.globalAlpha=0.07;c2.fillRect(x0,p2.t,x1-x0,ph2);c2.globalAlpha=1;}
+
+  const zy=tyD(0);
+  c2.strokeStyle=txt2;c2.lineWidth=1.5;c2.setLineDash([6,4]);c2.globalAlpha=0.35;c2.beginPath();c2.moveTo(p2.l,zy);c2.lineTo(p2.l+pw2,zy);c2.stroke();c2.setLineDash([]);c2.globalAlpha=1;
+  c2.fillStyle=txt2;c2.font='10px var(--font-mono)';c2.textAlign='right';c2.fillText('0',p2.l-3,zy+3);
+
+  for(let i=1;i<tPoints.length;i++){
+    const x0=txD(tPoints[i-1].t),x1=txD(tPoints[i].t);
+    const y0=tyD(derivData[i-1]),y1=tyD(derivData[i]);
+    const v=(derivData[i-1]+derivData[i])/2;
+    c2.strokeStyle=Math.abs(v)<dMax*0.08?'#1D9E75':(v>0?'#c0392b':'#2d5a7b');
+    c2.lineWidth=2.5;c2.setLineDash([6,4]);c2.beginPath();c2.moveTo(x0,y0);c2.lineTo(x1,y1);c2.stroke();c2.setLineDash([]);
+  }
+
+  zeroCrossings.forEach(zi=>{
+    if(zi>=tPoints.length) return;
+    const zx=txD(tPoints[zi].t);
+    c2.fillStyle='#1D9E75';c2.beginPath();c2.arc(zx,zy,5,0,Math.PI*2);c2.fill();
+    c2.strokeStyle='#fff';c2.lineWidth=1.5;c2.beginPath();c2.arc(zx,zy,5,0,Math.PI*2);c2.stroke();
+  });
+
+  const cdx=txD(t),cdy=tyD(derivData[curIdx]||0);
+  c2.fillStyle='#c0392b';c2.beginPath();c2.arc(cdx,cdy,4,0,Math.PI*2);c2.fill();
+  c2.strokeStyle=txt;c2.lineWidth=1;c2.setLineDash([2,2]);c2.beginPath();c2.moveTo(cdx,p2.t);c2.lineTo(cdx,p2.t+ph2);c2.stroke();c2.setLineDash([]);
+
+  c2.fillStyle=txt2;c2.font='11px var(--font-sans)';c2.textAlign='center';c2.fillText('Training step t (log scale)',p2.l+pw2/2,h2-2);
+  c2.save();c2.translate(8,p2.t+ph2/2);c2.rotate(-Math.PI/2);c2.textAlign='center';c2.fillText('∂λ̂/∂log t',0,0);c2.restore();
+
+  document.getElementById('note').innerHTML=stageDescs[stg]+`<br><span style="color:#1D9E75;font-weight:500">● = zero crossing (stage boundary). Only ${zeroCrossings.length} in 50k steps.</span>`;
+}
+
+['cv1','cv2'].forEach(id=>{
+  const cv=document.getElementById(id);
+  function handleClick(e){
+    const r=cv.getBoundingClientRect();const frac=(e.clientX-r.left-36)/(r.width-48);
+    if(frac<0||frac>1)return;
+    const logT=2+frac*(Math.log10(50000)-2);const targetT=Math.pow(10,logT);
+    let best=0,bestD=Infinity;tPoints.forEach((pt,i)=>{const d=Math.abs(pt.t-targetT);if(d<bestD){bestD=d;best=i;}});
+    curIdx=best;const stg=getStage(tPoints[curIdx].t);
+    initChains();for(let w=0;w<40;w++)runSGLD(stg,1);for(let s=0;s<15;s++)runSGLD(stg,1);
+    render();
+  }
+  let drag=false;
+  cv.addEventListener('mousedown',e=>{drag=true;handleClick(e);});
+  cv.addEventListener('mousemove',e=>{if(drag)handleClick(e);});
+  window.addEventListener('mouseup',()=>{drag=false;});
+  cv.addEventListener('touchstart',e=>{e.preventDefault();handleClick(e.touches[0]);},{passive:false});
+  cv.addEventListener('touchmove',e=>{e.preventDefault();handleClick(e.touches[0]);},{passive:false});
+});
+
+initChains();runSGLD(0,50);render();
+window.addEventListener('resize',render);
+</script>

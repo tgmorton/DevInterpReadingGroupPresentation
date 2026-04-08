@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;font-family:'Source Sans 3',sans-serif;background:#fff}
+#app{display:flex;flex-direction:column;width:100%;height:100%}
+#canvas-wrap{flex:1;position:relative;background:#f6f6f4;cursor:grab;min-height:0}
+#canvas-wrap:active{cursor:grabbing}
+#canvas-wrap canvas{display:block;width:100%!important;height:100%!important}
+#bottom{padding:6px 14px}
+#info-panel{display:flex;gap:8px;flex-wrap:wrap}
+.info-card{flex:1;min-width:90px;background:#f6f6f4;border-radius:6px;padding:5px 8px;text-align:center}
+.info-n{font-size:14px;font-weight:500;color:#1a1a1a}
+.info-l{font-size:10px;color:#7a7a7a;margin-top:1px}
+.ctrls{display:flex;gap:8px;align-items:center;margin-bottom:4px}
+.ctrls button{font-family:inherit;font-size:12px;padding:3px 10px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer}
+.ctrls label{font-size:11px;color:#7a7a7a}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="canvas-wrap"><canvas id="c3d"></canvas></div>
+  <div id="bottom">
+    <div class="ctrls">
+      <button id="play-btn" onclick="toggleAnim()">Play SGD trajectory</button>
+      <button onclick="resetBall()">Reset</button>
+      <label>Rotate: drag · Zoom: scroll</label>
+    </div>
+    <div id="info-panel">
+      <div class="info-card"><div class="info-n" id="i-phase">—</div><div class="info-l">Current phase</div></div>
+      <div class="info-card"><div class="info-n" id="i-loss">—</div><div class="info-l">Loss</div></div>
+      <div class="info-card"><div class="info-n" id="i-llc">—</div><div class="info-l">LLC (λ)</div></div>
+      <div class="info-card"><div class="info-n" id="i-width">—</div><div class="info-l">Basin width</div></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// Wait for layout to settle, then init Three.js
+requestAnimationFrame(() => requestAnimationFrame(init));
+
+function init() {
+  const wrap = document.getElementById('canvas-wrap');
+  const canvas = document.getElementById('c3d');
+  const W = wrap.offsetWidth;
+  const H = wrap.offsetHeight;
+
+  const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
+  renderer.setSize(W, H);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0xf1efe8, 1);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(50, W/H, 0.1, 100);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  dirLight.position.set(5, 10, 5);
+  scene.add(dirLight);
+
+  const basins = [
+    {cx:-2.2, cz:0,    depth:0.07, width:1.8, llc:1.5, color:0xD85A30, name:'4⁻⁻ gon', label:'Wide + shallow'},
+    {cx:-0.2, cz:-1.2, depth:0.18, width:1.3, llc:3.0, color:0xBA7517, name:'4⁻ gon',  label:'Medium'},
+    {cx:1.2,  cz:0.5,  depth:0.24, width:1.0, llc:5.0, color:0xEF9F27, name:'4 gon',   label:'Getting narrower'},
+    {cx:3.0,  cz:-0.5, depth:0.28, width:0.7, llc:7.0, color:0x378ADD, name:'5 gon',   label:'Narrow + deep'},
+    {cx:4.5,  cz:0.8,  depth:0.30, width:0.45,llc:8.5, color:0x1D9E75, name:'6 gon',   label:'Narrowest + deepest'},
+  ];
+  const lossData = [0.28, 0.17, 0.111, 0.069, 0.048];
+  const plateau = 0.35, yScale = 10;
+
+  function lossAt(x, z) {
+    let val = plateau;
+    for (const b of basins) {
+      const dx = x-b.cx, dz = z-b.cz;
+      val -= b.depth * Math.exp(-(dx*dx+dz*dz) / (2*b.width*b.width*0.22));
+    }
+    return val;
+  }
+  function surfaceY(x, z) { return lossAt(x,z) * yScale; }
+
+  // Surface
+  const res = 120, gridSize = 12;
+  const geom = new THREE.PlaneGeometry(gridSize, gridSize, res, res);
+  geom.rotateX(-Math.PI/2);
+  const pos = geom.attributes.position;
+  const colors = new Float32Array(pos.count*3);
+  let minY=Infinity, maxY=-Infinity;
+  for (let i=0; i<pos.count; i++) {
+    const y = surfaceY(pos.getX(i), pos.getZ(i));
+    pos.setY(i, y);
+    if (y<minY) minY=y; if (y>maxY) maxY=y;
+  }
+  for (let i=0; i<pos.count; i++) {
+    const t = (pos.getY(i)-minY)/(maxY-minY);
+    colors[i*3]=0.55+t*0.35; colors[i*3+1]=0.60+t*0.25; colors[i*3+2]=0.75-t*0.05;
+  }
+  geom.setAttribute('color', new THREE.BufferAttribute(colors,3));
+  geom.computeVertexNormals();
+  scene.add(new THREE.Mesh(geom, new THREE.MeshPhongMaterial({vertexColors:true, side:THREE.DoubleSide, shininess:20, transparent:true, opacity:0.9})));
+
+  // Wireframe
+  const wGeo = new THREE.PlaneGeometry(gridSize, gridSize, 30, 30);
+  wGeo.rotateX(-Math.PI/2);
+  const wPos = wGeo.attributes.position;
+  for (let i=0; i<wPos.count; i++) wPos.setY(i, surfaceY(wPos.getX(i), wPos.getZ(i))+0.01);
+  wGeo.computeVertexNormals();
+  scene.add(new THREE.Mesh(wGeo, new THREE.MeshBasicMaterial({color:0x999999, wireframe:true, transparent:true, opacity:0.12})));
+
+  // Basin markers
+  for (const b of basins) {
+    const my = surfaceY(b.cx, b.cz);
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.07,12,12), new THREE.MeshPhongMaterial({color:b.color, emissive:b.color, emissiveIntensity:0.4}));
+    m.position.set(b.cx, my-0.02, b.cz); scene.add(m);
+    const rGeo = new THREE.RingGeometry(b.width*0.42, b.width*0.47, 32);
+    rGeo.rotateX(-Math.PI/2);
+    const ring = new THREE.Mesh(rGeo, new THREE.MeshBasicMaterial({color:b.color, transparent:true, opacity:0.4, side:THREE.DoubleSide}));
+    ring.position.set(b.cx, my+0.05, b.cz); scene.add(ring);
+  }
+
+  // Ball
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(0.13,16,16), new THREE.MeshPhongMaterial({color:0xE24B4A, emissive:0xE24B4A, emissiveIntensity:0.5}));
+  scene.add(ball);
+
+  const trailPoints = [];
+  let trailLine = null;
+  const stops = [
+    {bi:0,dur:80},{bi:0,dur:40,moveTo:1},{bi:1,dur:60},{bi:1,dur:30,moveTo:2},
+    {bi:2,dur:80},{bi:2,dur:40,moveTo:3},{bi:3,dur:100},{bi:3,dur:50,moveTo:4},{bi:4,dur:120}
+  ];
+  let totalFrames=0; for(const s of stops) totalFrames+=s.dur;
+
+  function getBallPos(fr) {
+    let f=fr%totalFrames, accum=0;
+    for (const s of stops) {
+      if (f<accum+s.dur) {
+        const t=(f-accum)/s.dur;
+        if (s.moveTo!==undefined) {
+          const from=basins[s.bi], to=basins[s.moveTo];
+          const x=from.cx+(to.cx-from.cx)*t, z=from.cz+(to.cz-from.cz)*t;
+          return {x, y:surfaceY(x,z)-0.13, z, bi:t<0.5?s.bi:s.moveTo, transitioning:true};
+        } else {
+          const b=basins[s.bi];
+          const x=b.cx+Math.sin(t*Math.PI*6)*b.width*0.12;
+          const z=b.cz+Math.cos(t*Math.PI*4)*b.width*0.08;
+          return {x, y:surfaceY(x,z)-0.13, z, bi:s.bi, transitioning:false};
+        }
+      }
+      accum+=s.dur;
+    }
+    return {x:0,y:0,z:0,bi:0,transitioning:false};
+  }
+
+  let frame=0, playing=false;
+  window.toggleAnim = () => { playing=!playing; document.getElementById('play-btn').textContent=playing?'Pause':'Play SGD trajectory'; };
+  window.resetBall = () => {
+    frame=0; playing=false; trailPoints.length=0;
+    if(trailLine){scene.remove(trailLine);trailLine=null;}
+    document.getElementById('play-btn').textContent='Play SGD trajectory';
+    updateInfo(getBallPos(0));
+  };
+
+  function updateInfo(p) {
+    const b=basins[p.bi];
+    document.getElementById('i-phase').textContent=b.name;
+    document.getElementById('i-phase').style.color='#'+b.color.toString(16).padStart(6,'0');
+    document.getElementById('i-loss').textContent=lossData[p.bi].toFixed(3);
+    document.getElementById('i-llc').textContent=b.llc.toFixed(1);
+    document.getElementById('i-width').textContent=b.label;
+  }
+
+  // Camera controls
+  let isDragging=false, prevMouse={x:0,y:0};
+  let camTheta=0.6, camPhi=0.55, camDist=13;
+  const lookTarget = new THREE.Vector3(1, 1.5, 0);
+
+  wrap.addEventListener('mousedown', e=>{isDragging=true;prevMouse={x:e.clientX,y:e.clientY}});
+  window.addEventListener('mousemove', e=>{
+    if(!isDragging)return;
+    camTheta-=(e.clientX-prevMouse.x)*0.008;
+    camPhi=Math.max(0.1,Math.min(1.4,camPhi-(e.clientY-prevMouse.y)*0.008));
+    prevMouse={x:e.clientX,y:e.clientY};
+  });
+  window.addEventListener('mouseup',()=>isDragging=false);
+  wrap.addEventListener('wheel', e=>{e.preventDefault();camDist=Math.max(5,Math.min(22,camDist+e.deltaY*0.01))},{passive:false});
+
+  function animate() {
+    requestAnimationFrame(animate);
+    camera.position.set(camDist*Math.sin(camTheta)*Math.cos(camPhi)+1, camDist*Math.sin(camPhi)+1, camDist*Math.cos(camTheta)*Math.cos(camPhi));
+    camera.lookAt(lookTarget);
+    if(playing){frame++; if(frame>=totalFrames){frame=totalFrames-1;playing=false;document.getElementById('play-btn').textContent='Play SGD trajectory';}}
+    const p=getBallPos(frame);
+    ball.position.set(p.x,p.y,p.z);
+    updateInfo(p);
+    if(playing){
+      trailPoints.push(new THREE.Vector3(p.x,p.y+0.05,p.z));
+      if(trailPoints.length>2){
+        if(trailLine)scene.remove(trailLine);
+        trailLine=new THREE.Line(new THREE.BufferGeometry().setFromPoints(trailPoints), new THREE.LineBasicMaterial({color:0xE24B4A,transparent:true,opacity:0.6}));
+        scene.add(trailLine);
+      }
+    }
+    renderer.render(scene,camera);
+  }
+
+  resetBall();
+  animate();
+
+  // Handle resize
+  window.addEventListener('resize', () => {
+    const w=wrap.offsetWidth, h=wrap.offsetHeight;
+    renderer.setSize(w,h);
+    camera.aspect=w/h;
+    camera.updateProjectionMatrix();
+  });
+}
+</script>
+</body></html>
